@@ -1,0 +1,13 @@
+name = "OneLoopFermiLiquid"
+uuid = "313cc152-9680-42ce-b692-970a743b5da0"
+authors = ["Daniel Cerkoney <dcerkoney@physics.rutgers.edu>"]
+version = "1.0.0-DEV"
+
+[compat]
+julia = "1.10"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
