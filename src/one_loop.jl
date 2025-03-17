@@ -400,9 +400,7 @@ function get_yukawa_one_loop_neft(rslist, beta; neval=1e6, seed=1234)
         # (1, 0, 0)
         obs = real(data[p[2]])
 
-        # # (0, 1, 0)
-        # obs_gct = real(data[p[3]])
-        # println("(G counterterms)\tup-up: $(obs_gct[1]), up-down: $(obs_gct[2])")
+        # NOTE: data[p[4]] = data[(0, 1, 0)] is empty (no non-zero diagrams)
 
         # (0, 0, 1)
         obs_ict = real(data[p[4]])

@@ -6,6 +6,7 @@ module OneLoopFermiLiquid
 using CodecZlib
 using CompositeGrids
 using ElectronGas
+using ElectronLiquid
 using GreenFunc
 using JLD2
 using Lehmann
@@ -14,6 +15,7 @@ using MCIntegration
 using MPI
 using ProgressMeter
 using Parameters
+using Test
 
 const MAXIMUM_STEPS = 100
 const PROJECT_ROOT = pkgdir(LQSGW)
