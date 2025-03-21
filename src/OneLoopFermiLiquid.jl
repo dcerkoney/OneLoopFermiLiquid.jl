@@ -3,13 +3,16 @@ Calculate the Fermi liquid parameters to one-loop order in the local Fermi-liqui
 """
 module OneLoopFermiLiquid
 
+using AbstractTrees
 using CodecZlib
 using CompositeGrids
 using ElectronGas
 using ElectronLiquid
+using FeynmanDiagram
 using GreenFunc
 using JLD2
 using Lehmann
+using LinearAlgebra
 using LQSGW
 using MCIntegration
 using MPI
@@ -17,12 +20,18 @@ using ProgressMeter
 using Parameters
 using Test
 
+import FeynmanDiagram.FrontEnds: TwoBodyChannel, Alli, PHr, PHEr, PPr, AnyChan
+import FeynmanDiagram.FrontEnds:
+    Filter, NoHartree, NoFock, DirectOnly, Wirreducible, Girreducible, NoBubble, Proper
+import FeynmanDiagram.FrontEnds: Response, Composite, ChargeCharge, SpinSpin, UpUp, UpDown
+import FeynmanDiagram.FrontEnds: AnalyticProperty, Instant, Dynamic
+
 const MAXIMUM_STEPS = 100
 const PROJECT_ROOT = pkgdir(LQSGW)
 const DATA_DIR = joinpath(PROJECT_ROOT, "data")
 
 include("one_loop_parameters.jl")
-export OneLoopsParams,
+export OneLoopParams,
     MomInterpGridType, MomGridType, MGridType, FreqGridType, AngularGridType
 
 include("fermi_liquid_interactions.jl")
@@ -32,7 +41,7 @@ include("propagators.jl")
 export G0, r_interp
 
 include("tree_level.jl")
-export get_tree_level_self_consistent_Fs, get_F1, get_Z1
+export get_tree_level_self_consistent_Fs, get_F1, get_F1_TF, get_Z1
 export Σ1, integrand_F1, x_NF_R0, x_NF_VTF
 
 include("matsubara_sums.jl")
@@ -46,6 +55,7 @@ export one_loop_vertex_corrections,
     one_loop_box_diagrams, one_loop_direct_box_diagrams, one_loop_counterterms
 
 const alpha_ueg = (4 / 9π)^(1 / 3)
+export alpha_ueg
 
 """
     lerp(M_start, M_end, alpha)

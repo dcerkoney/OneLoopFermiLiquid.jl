@@ -5,12 +5,13 @@ using ElectronGas
 using ElectronLiquid
 using FeynmanDiagram
 using GreenFunc
-# using JLD2
+using JLD2
 using LinearAlgebra
 using Lehmann
 using LQSGW
 using Measurements
 using MPI
+using OneLoopFermiLiquid
 using Parameters
 using ProgressMeter
 using PyCall
@@ -408,8 +409,8 @@ function plot_direct_box_matsubara_sum(param::OneLoopParams; which="both")
     end
 end
 
-function plot_F_uu_ud_NEFT(rslist, ftype)
-    ftypestr = ftype == "Fs" ? "F^{s}" : "F^{a}"
+function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
+    # ftypestr = ftype == "Fs" ? "F^{s}" : "F^{a}"
 
     interactionstr = isDynamic ? "" : "_yukawa"
     zstr = z_renorm ? "_z_renorm" : ""
@@ -422,16 +423,33 @@ function plot_F_uu_ud_NEFT(rslist, ftype)
     euv = 10.0
     rtol = 1e-7
 
-    # Load NEFT benchmark data using np
-    F1NEFTs = np.load("F1NEFTs.npy")
-    Fuu2NEFTs = np.load("Fuu2NEFTs.npy")
-    Fud2NEFTs = np.load("Fud2NEFTs.npy")
-    FuutotalNEFTs = np.load("FuutotalNEFTs.npy")
-    FudtotalNEFTs = np.load("FudtotalNEFTs.npy")
-    # FstotalNEFTs = np.load("FstotalNEFTs.npy")
-    # FatotalNEFTs = np.load("FatotalNEFTs.npy")
-    # FtotalNEFTs = np.load("FtotalNEFTs.npy")
-    # F2NEFTs = np.load("F2NEFTs.npy")
+    # Load NEFT benchmark data using jld2
+    @load "one_loop_F_neft.jld2" rslist FsDMCs FaDMCs F1NEFTs Fs2NEFTs Fa2NEFTs FstotalNEFTs FatotalNEFTs Fuu2NEFTs Fud2NEFTs FuutotalNEFTs FudtotalNEFTs F1s_exact F2cts_exact Fuu1s Fud1s Fs2s Fa2s Fuu2vpbs Fud2vpbs Fuu2cts Fud2cts Fuu2s Fud2s
+    rslist_big = rslist
+
+    Fuu2totalNEFTs = Fuu1s .+ Fuu2NEFTs
+    Fud2totalNEFTs = Fud1s .+ Fud2NEFTs
+
+    # # Load our data using jld2
+    # @load "one_loop_Fs_ours.jld2" rslist F1s F2vs F2bs F2cts F2zs F2s
+    # rslist_small = rslist
+    # Fs2vs = F2vs
+    # Fs2bs = F2bs
+    # Fs2cts = F2cts
+    # Fs2zs = F2zs
+    # Fs2s = F2s
+    # @load "one_loop_Fa_ours.jld2" rslist F1s F2vs F2bs F2cts F2zs F2s
+    # @assert rslist == rslist_small
+    # Fa2vs = F2vs
+    # Fa2bs = F2bs
+    # Fa2cts = F2cts
+    # Fa2zs = F2zs
+    # Fa2s = F2s
+
+    # # Fs = (F↑↑ + F↑↓) / 2, Fa = (F↑↑ - F↑↓) / 2,
+    # # so F↑↑ = Fs + Fa, F↑↓ = Fs - Fa
+    # Fuu2s = Fs2s .+ Fa2s
+    # Fud2s = Fs2s .- Fa2s
 
     fig, ax = plt.subplots(; figsize=(5, 5))
     # NEFT benchmark
@@ -472,7 +490,7 @@ function plot_F_uu_ud_NEFT(rslist, ftype)
         rslist,
         Measurements.value.(FuutotalNEFTs),
         Measurements.uncertainty.(FuutotalNEFTs);
-        label="\$F^{\\uparrow\\uparrow}\$ to \$\\mathcal{O}(\\xi^2)\$",
+        label="\$F_1\\xi + F^{\\uparrow\\uparrow}_2 \\xi^2\$",
         capthick=1,
         capsize=4,
         fmt="o-",
@@ -483,7 +501,7 @@ function plot_F_uu_ud_NEFT(rslist, ftype)
         rslist,
         Measurements.value.(FudtotalNEFTs),
         Measurements.uncertainty.(FudtotalNEFTs);
-        label="\$F^{\\uparrow\\downarrow}\$ to \$\\mathcal{O}(\\xi^2)\$",
+        label="\$F_1\\xi + F^{\\uparrow\\downarrow}_2 \\xi^2\$",
         capthick=1,
         capsize=4,
         fmt="o-",
@@ -492,8 +510,8 @@ function plot_F_uu_ud_NEFT(rslist, ftype)
     )
     ax.set_xlabel("\$r_s\$")
     # ax.set_ylabel("\$F^{\\sigma_1 \\sigma_2}\$")
-    if isDynamic == false && ftype == "Fs"
-        ax.set_ylim(-0.42, 0.42)
+    if isDynamic == false
+        ax.set_ylim(-0.05, 1.45)
     end
     # ax.set_ylabel("\$F^s\$")
     ax.legend(; ncol=2, fontsize=12, loc="best", columnspacing=0.5)
@@ -838,11 +856,11 @@ function main()
     # Yukawa interaction
     isDynamic = false
 
-    ftype = "Fs"  # f^{Di} + f^{Ex} / 2
-    # ftype = "Fa"  # f^{Ex} / 2
+    # ftype = "Fs"  # f^{Di} + f^{Ex} / 2
+    ftype = "Fa"  # f^{Ex} / 2
 
     # Plot NEFT benchmark data for F↑↑ and F↑↓ vs rs
-    plot_F_uu_ud_NEFT(rslist, ftype)
+    plot_F_uu_ud_NEFT(isDynamic, z_renorm)
 
     # # Plot extras
     # plot_extras(rslist, ftype)

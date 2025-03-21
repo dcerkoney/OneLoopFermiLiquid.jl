@@ -1,5 +1,4 @@
 
-
 """
 Calculates and returns the one-loop vertex corrections:
 
@@ -327,7 +326,7 @@ Benchmark for the one-loop calculation of F for the Yukawa-type theory using the
 """
 function get_yukawa_one_loop_neft(rslist, beta; neval=1e6, seed=1234)
     # One-loop => only interaction-type counterterms
-    p = UEG.partition(1; offset=0)  # TEST: G-type counterterms should be removed by Diagram.diagram_parquet_response!
+    partitions = UEG.partition(1; offset=0)  # TEST: G-type counterterms should be removed by Diagram.diagram_parquet_response!
 
     dummy_paramc = ElectronLiquid.ParaMC(;
         rs=0.01,
@@ -341,14 +340,22 @@ function get_yukawa_one_loop_neft(rslist, beta; neval=1e6, seed=1234)
     # NOTE: we need to include the bubble diagram, as it will be cancelled numerically by the interaction counterterm
     filter = [Proper, NoHartree]  # Proper => only exchange and box-type direct diagrams contribute to F₂
 
+    # Setup forward-scattering extK and zero transfer momentum ((Q,Ω) → 0 limit)
+    KinL, KoutL, KinR, KoutR = zeros(16), zeros(16), zeros(16), zeros(16)
+    KinL[1] = KoutL[1] = 1  # k  →  k
+    KinR[2] = KoutR[2] = 1  # k' →  k'
+    Q = KinL - KoutL        # Q = 0
+    extK = (KinL, KoutL, KinR, KoutR)
+
     # returns: (partition, diagpara, FeynGraphs, extT_labels, spin_conventions)
     # graphs contain: {{↑↑ diags}, {↑↓ diags}}
     diagrams = Diagram.diagram_parquet_response(
         :vertex4,
         dummy_paramc,
-        p;
+        partitions;
         filter=filter,
-        transferLoop=zeros(16),  # (Q,Ω) → 0
+        transferLoop=Q,
+        extK=extK,
     )
     graphs = diagrams[3]
     isUpUp =
@@ -361,9 +368,17 @@ function get_yukawa_one_loop_neft(rslist, beta; neval=1e6, seed=1234)
     println("isUpUp: $isUpUp")
     println("isUpDown: $isUpDown")
 
+    FsDMCs = []
+    FaDMCs = []
     F1s = []
+    Fuu1s = []
+    Fud1s = []
     Fs2s = []
     Fa2s = []
+    Fuu2vpbs = []
+    Fud2vpbs = []
+    Fuu2cts = []
+    Fud2cts = []
     Fuu2s = []
     Fud2s = []
     for rs in rslist
@@ -389,33 +404,44 @@ function get_yukawa_one_loop_neft(rslist, beta; neval=1e6, seed=1234)
             diagrams;
             neval=neval,
             l=[0],
-            n=[-1, 0, 0],
+            n=[0, 0, 0],
+            # n=[-1, 0, 0],
             seed=seed,
             print=-1,
         )
 
         # (0, 0, 0)
-        obs_tl = real(data[p[1]])
+        obs_tl = real(data[partitions[1]])
 
         # (1, 0, 0)
-        obs = real(data[p[2]])
+        obs = real(data[partitions[2]])
 
-        # NOTE: data[p[4]] = data[(0, 1, 0)] is empty (no non-zero diagrams)
+        # NOTE: data[partitions[4]] = data[(0, 1, 0)] is empty (no non-zero diagrams)
 
         # (0, 0, 1)
-        obs_ict = real(data[p[4]])
+        obs_ict = real(data[partitions[4]])
 
-        @assert length(obs_tl) == 2                  # obs = {↑↑Ins, ↑↓Ins}
-        @assert length(obs) == length(obs_ict) == 6  # obs = {PHr ↑↑Dyn, PPr ↑↑Dyn, PHEr ↑↑Dyn, PHr ↑↓Dyn, PPr ↑↓Dyn, PHEr ↑↓Dyn}
+        println(data)
+        # println(length(obs_tl))
+        # println(length(obs_ict))
+        # println(length(obs))
 
-        F1uu = -isUpUp' * obs_tl
-        F1ud = -isUpDown' * obs_tl
+        # @assert length(obs_tl) == length(obs_ict) == 1  # {↑↑Ins} (NOTE: ↑↓Ins is empty for Proper in filter)
+        # @assert length(obs)== 5                         # obs_ict = {PHr ↑↑Dyn, PPr ↑↑Dyn, PHEr ↑↑Dyn, PPr ↑↓Dyn, PHEr ↑↓Dyn} (NOTE: PHr ↑↓Dyn is empty for Proper in filter)
 
-        F2uu = -isUpUp' * obs
-        F2ud = -isUpDown' * obs
+        @assert length(obs_tl) == length(obs) == length(obs_ict) == 2  # {↑↑, ↑↓}
+        F1uu, F1ud = obs_tl
+        F2uu, F2ud = obs
+        F2ctuu, F2ctud = obs_ict
 
-        F2ctuu = -isUpUp' * obs_ict
-        F2ctud = -isUpDown' * obs_ict
+        # F1uu = -isUpUp[partitions[1]]' * obs_tl
+        # F1ud = -isUpDown[partitions[1]]' * obs_tl
+
+        # F2uu = -isUpUp[partitions[2]]' * obs
+        # F2ud = -isUpDown[partitions[2]]' * obs
+
+        # F2ctuu = -isUpUp[partitions[4]]' * obs_ict
+        # F2ctud = -isUpDown[partitions[4]]' * obs_ict
 
         println("(tree-level)\tup-up: $F1uu, up-down: $F1ud")
         println("(one-loop diagrams)\tup-up: $F2uu, up-down: $F2ud")
@@ -445,11 +471,29 @@ function get_yukawa_one_loop_neft(rslist, beta; neval=1e6, seed=1234)
         push!(FsDMCs, Fs_DMC)
         push!(FaDMCs, Fa_DMC)
         push!(F1s, F1)
+        push!(Fuu1s, F1uu)
+        push!(Fud1s, F1ud)
         push!(Fs2s, F2s)
         push!(Fa2s, F2a)
+        push!(Fuu2vpbs, F2uu)
+        push!(Fud2vpbs, F2ud)
+        push!(Fuu2cts, F2ctuu)
+        push!(Fud2cts, F2ctud)
         push!(Fuu2s, F2totaluu)
         push!(Fud2s, F2totalud)
         GC.gc()
     end
-    return FsDMCs, FaDMCs, F1s, Fs2s, Fa2s, Fuu2s, Fud2s
+    return FsDMCs,
+    FaDMCs,
+    F1s,
+    Fuu1s,
+    Fud1s,
+    Fs2s,
+    Fa2s,
+    Fuu2vpbs,
+    Fud2vpbs,
+    Fuu2cts,
+    Fud2cts,
+    Fuu2s,
+    Fud2s
 end

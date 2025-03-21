@@ -5,18 +5,20 @@ using ElectronGas
 using ElectronLiquid
 using FeynmanDiagram
 using GreenFunc
-# using JLD2
+using JLD2
 using LinearAlgebra
 using Lehmann
 using LQSGW
 using Measurements
 using MPI
+using OneLoopFermiLiquid
 using Parameters
 using ProgressMeter
 using PyCall
 using Roots
 using Test
 
+import OneLoopFermiLiquid: lindhard, check_sign_Fs, check_signs_Fs_Fa, testdlr
 import LQSGW: split_count, println_root, timed_result_to_string
 
 import FeynmanDiagram.FrontEnds: TwoBodyChannel, Alli, PHr, PHEr, PPr, AnyChan
@@ -33,7 +35,7 @@ function main()
     root = 0
     rank = MPI.Comm_rank(comm)
 
-    rslist = [1, 10]
+    rslist = [1, 5, 10]
     beta = 40.0
 
     # For fast Fa
@@ -49,7 +51,7 @@ function main()
     show_progress = true
 
     run_neft = true
-    run_ours = true
+    run_ours = false
 
     # Yukawa interaction
     isDynamic = false
@@ -67,15 +69,24 @@ function main()
 
     # Calculate the one-loop results for F↑↑ and F↑↓ using NEFT and/or our code
     if run_neft
-        FsDMCs, FaDMCs, F1NEFTs, Fs2NEFTs, Fa2NEFTs, Fuu2NEFTs, Fud2NEFTs =
-            get_yukawa_one_loop_neft(rslist, beta; neval=1e5)
+        FsDMCs,
+        FaDMCs,
+        F1s,
+        Fuu1s,
+        Fud1s,
+        Fs2s,
+        Fa2s,
+        Fuu2vpbs,
+        Fud2vpbs,
+        Fuu2cts,
+        Fud2cts,
+        Fuu2s,
+        Fud2s = get_yukawa_one_loop_neft(rslist, beta; neval=1e7)
 
-        FstotalNEFTs = F1NEFTs .+ Fs2NEFTs
-        FatotalNEFTs = F1NEFTs .+ Fa2NEFTs
-        FuutotalNEFTs = F1NEFTs .+ Fuu2NEFTs
-        FudtotalNEFTs = F1NEFTs .+ Fud2NEFTs
-        F2NEFTs = ftype == "Fs" ? Fs2NEFTs : Fa2NEFTs
-        FtotalNEFTs = ftype == "Fs" ? FstotalNEFTs : FatotalNEFTs
+        FstotalNEFTs = F1s .+ Fs2s
+        FatotalNEFTs = F1s .+ Fa2s
+        FuutotalNEFTs = Fuu1s .+ Fuu2s
+        FudtotalNEFTs = Fud1s .+ Fud2s
 
         # Get Thomas-Fermi result for F1 using exact expression
         rs_exact = LinRange(0, 10, 1000)
@@ -98,19 +109,7 @@ function main()
 
         # Save NEFT and exact results to np files
         if save && rank == root
-            np.save("FsDMCs.npy", FsDMCs)
-            np.save("FaDMCs.npy", FaDMCs)
-            np.save("F1NEFTs.npy", F1NEFTs)
-            np.save("FstotalNEFTs.npy", FstotalNEFTs)
-            np.save("FatotalNEFTs.npy", FatotalNEFTs)
-            np.save("Fuu2NEFTs.npy", Fuu2NEFTs)
-            np.save("Fud2NEFTs.npy", Fud2NEFTs)
-            np.save("FuutotalNEFTs.npy", FuutotalNEFTs)
-            np.save("FudtotalNEFTs.npy", FudtotalNEFTs)
-            np.save("F2NEFTs.npy", F2NEFTs)
-            np.save("FtotalNEFTs.npy", FtotalNEFTs)
-            np.save("F1s_exact.npy", F1s_exact)
-            np.save("F2cts_exact.npy", F2cts_exact)
+            @save "one_loop_F_neft.jld2" rslist FsDMCs FaDMCs FstotalNEFTs FatotalNEFTs Fuu2NEFTs Fud2NEFTs FuutotalNEFTs FudtotalNEFTs F1s_exact F2cts_exact Fuu1s Fud1s Fs2s Fa2s Fuu2vpbs Fud2vpbs Fuu2cts Fud2cts Fuu2s Fud2s
         end
     end
     if run_ours
@@ -177,12 +176,7 @@ function main()
         end
         # Save our results to np files
         if save && rank == root
-            np.save("F1s.npy", F1s)
-            np.save("F2vs.npy", F2vs)
-            np.save("F2bs.npy", F2bs)
-            np.save("F2cts.npy", F2cts)
-            np.save("F2zs.npy", F2zs)
-            np.save("F2s.npy", F2s)
+            @save "one_loop_$(ftype)_ours.jld2" rslist Fs_DMCs Fa_DMCs F1s F2vs F2bs F2cts F2zs F2s
         end
     end
     MPI.Finalize()
