@@ -409,117 +409,6 @@ function plot_direct_box_matsubara_sum(param::OneLoopParams; which="both")
     end
 end
 
-function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
-    # ftypestr = ftype == "Fs" ? "F^{s}" : "F^{a}"
-
-    interactionstr = isDynamic ? "" : "_yukawa"
-    zstr = z_renorm ? "_z_renorm" : ""
-
-    # nk ≈ na ≈ 100 is sufficiently converged for all relevant euv/rtol
-    Nk, Ok = 7, 6
-    Na, Oa = 8, 7
-
-    # DLR parameters for which r(q, 0) is smooth in the q → 0 limit (tested for rs = 1, 10)
-    euv = 10.0
-    rtol = 1e-7
-
-    # Load NEFT benchmark data using jld2
-    @load "one_loop_F_neft.jld2" rslist FsDMCs FaDMCs F1NEFTs Fs2NEFTs Fa2NEFTs FstotalNEFTs FatotalNEFTs Fuu2NEFTs Fud2NEFTs FuutotalNEFTs FudtotalNEFTs F1s_exact F2cts_exact Fuu1s Fud1s Fs2s Fa2s Fuu2vpbs Fud2vpbs Fuu2cts Fud2cts Fuu2s Fud2s
-    rslist_big = rslist
-
-    Fuu2totalNEFTs = Fuu1s .+ Fuu2NEFTs
-    Fud2totalNEFTs = Fud1s .+ Fud2NEFTs
-
-    # # Load our data using jld2
-    # @load "one_loop_Fs_ours.jld2" rslist F1s F2vs F2bs F2cts F2zs F2s
-    # rslist_small = rslist
-    # Fs2vs = F2vs
-    # Fs2bs = F2bs
-    # Fs2cts = F2cts
-    # Fs2zs = F2zs
-    # Fs2s = F2s
-    # @load "one_loop_Fa_ours.jld2" rslist F1s F2vs F2bs F2cts F2zs F2s
-    # @assert rslist == rslist_small
-    # Fa2vs = F2vs
-    # Fa2bs = F2bs
-    # Fa2cts = F2cts
-    # Fa2zs = F2zs
-    # Fa2s = F2s
-
-    # # Fs = (F↑↑ + F↑↓) / 2, Fa = (F↑↑ - F↑↓) / 2,
-    # # so F↑↑ = Fs + Fa, F↑↓ = Fs - Fa
-    # Fuu2s = Fs2s .+ Fa2s
-    # Fud2s = Fs2s .- Fa2s
-
-    fig, ax = plt.subplots(; figsize=(5, 5))
-    # NEFT benchmark
-    ax.errorbar(
-        rslist,
-        Measurements.value.(F1NEFTs),
-        Measurements.uncertainty.(F1NEFTs);
-        label="\$F_1 \\xi\$",
-        capthick=1,
-        capsize=4,
-        fmt="o-",
-        ms=5,
-        color=cdict["black"],
-    )
-    ax.errorbar(
-        rslist,
-        Measurements.value.(Fuu2NEFTs),
-        Measurements.uncertainty.(Fuu2NEFTs);
-        label="\$F^{\\uparrow\\uparrow}_2 \\xi^2\$",
-        capthick=1,
-        capsize=4,
-        fmt="o-",
-        ms=5,
-        color=cdict["blue"],
-    )
-    ax.errorbar(
-        rslist,
-        Measurements.value.(Fud2NEFTs),
-        Measurements.uncertainty.(Fud2NEFTs);
-        label="\$F^{\\uparrow\\downarrow}_2 \\xi^2\$",
-        capthick=1,
-        capsize=4,
-        fmt="o-",
-        ms=5,
-        color=cdict["cyan"],
-    )
-    ax.errorbar(
-        rslist,
-        Measurements.value.(FuutotalNEFTs),
-        Measurements.uncertainty.(FuutotalNEFTs);
-        label="\$F_1\\xi + F^{\\uparrow\\uparrow}_2 \\xi^2\$",
-        capthick=1,
-        capsize=4,
-        fmt="o-",
-        ms=5,
-        color=cdict["orange"],
-    )
-    ax.errorbar(
-        rslist,
-        Measurements.value.(FudtotalNEFTs),
-        Measurements.uncertainty.(FudtotalNEFTs);
-        label="\$F_1\\xi + F^{\\uparrow\\downarrow}_2 \\xi^2\$",
-        capthick=1,
-        capsize=4,
-        fmt="o-",
-        ms=5,
-        color=cdict["magenta"],
-    )
-    ax.set_xlabel("\$r_s\$")
-    # ax.set_ylabel("\$F^{\\sigma_1 \\sigma_2}\$")
-    if isDynamic == false
-        ax.set_ylim(-0.05, 1.45)
-    end
-    # ax.set_ylabel("\$F^s\$")
-    ax.legend(; ncol=2, fontsize=12, loc="best", columnspacing=0.5)
-    plt.tight_layout()
-    fig.savefig("oneshot_one_loop_F_uu_and_ud_yukawa_vs_rs$(interactionstr)_neft.pdf")
-    plt.close(fig)
-end
-
 function plot_extras(rslist, ftype)
     ftypestr = ftype == "Fs" ? "F^{s}" : "F^{a}"
 
@@ -834,12 +723,306 @@ function plot_extras(rslist, ftype)
     plt.close(fig)
 end
 
+function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
+    # ftypestr = ftype == "Fs" ? "F^{s}" : "F^{a}"
+
+    interactionstr = isDynamic ? "" : "_yukawa"
+    zstr = z_renorm ? "_z_renorm" : ""
+
+    # nk ≈ na ≈ 100 is sufficiently converged for all relevant euv/rtol
+    Nk, Ok = 7, 6
+    Na, Oa = 8, 7
+
+    # DLR parameters for which r(q, 0) is smooth in the q → 0 limit (tested for rs = 1, 10)
+    euv = 10.0
+    rtol = 1e-7
+
+    # Load NEFT benchmark data using jld2
+    @load "one_loop_F_neft.jld2" rslist F1s_exact Fuu1s_exact Fud1s_exact F2cts_exact Fuu1s Fud1s Fuu2vpbs Fud2vpbs Fuu2cts Fud2cts Fuu2s Fud2s Fuutotals Fudtotals
+    rslist_big = rslist
+
+    # Load our data using jld2
+    @load "one_loop_Fs_ours.jld2" rslist F1s F2vs F2bs F2cts F2zs F2s
+    rslist_small = rslist
+    Fs1s = F1s
+    Fs2vs = F2vs
+    Fs2bs = F2bs
+    Fs2cts = F2cts
+    Fs2zs = F2zs
+    Fs2s = F2s
+    @load "one_loop_Fa_ours.jld2" rslist F1s F2vs F2bs F2cts F2zs F2s
+    @assert rslist == rslist_small
+    Fa1s = F1s
+    Fa2vs = F2vs
+    Fa2bs = F2bs
+    Fa2cts = F2cts
+    Fa2zs = F2zs
+    Fa2s = F2s
+
+    # Fs = (F↑↑ + F↑↓) / 2, Fa = (F↑↑ - F↑↓) / 2,
+    # so F↑↑ = Fs + Fa, F↑↓ = Fs - Fa
+
+    Fuu1s_ours = Fs1s .+ Fa1s
+    Fud1s_ours = Fs1s .- Fa1s
+
+    Fuu2vs_ours = Fs2vs .+ Fa2vs
+    Fud2vs_ours = Fs2vs .- Fa2vs
+
+    Fuu2bs_ours = Fs2bs .+ Fa2bs
+    Fud2bs_ours = Fs2bs .- Fa2bs
+
+    Fuu2cts_ours = Fs2cts .+ Fa2cts
+    Fud2cts_ours = Fs2cts .- Fa2cts
+
+    Fuu2s_ours = Fs2s .+ Fa2s
+    Fud2s_ours = Fs2s .- Fa2s
+
+    Fuutotals_ours = Fuu1s_ours .+ Fuu2s_ours
+    Fudtotals_ours = Fud1s_ours .+ Fud2s_ours
+
+    fig, ax = plt.subplots(; figsize=(5, 5))
+    # NEFT benchmark
+    ax.errorbar(
+        rslist_big,
+        Measurements.value.(Fuu1s),
+        Measurements.uncertainty.(Fuu1s);
+        label="\$F^{\\uparrow\\uparrow}_1 \\xi\$",
+        capthick=1,
+        capsize=4,
+        fmt="o-",
+        ms=5,
+        color=cdict["black"],
+    )
+    # ax.errorbar(
+    #     rslist_big,
+    #     Measurements.value.(Fud1s),
+    #     Measurements.uncertainty.(Fud1s);
+    #     label="\$F^{\\uparrow\\downarrow}_1 \\xi\$",
+    #     capthick=1,
+    #     capsize=4,
+    #     fmt="o-",
+    #     ms=5,
+    #     color=cdict["grey"],
+    # )
+    ax.errorbar(
+        rslist_big,
+        Measurements.value.(Fuu2s),
+        Measurements.uncertainty.(Fuu2s);
+        label="\$F^{\\uparrow\\uparrow}_2 \\xi^2\$",
+        capthick=1,
+        capsize=4,
+        fmt="o-",
+        ms=5,
+        color=cdict["magenta"],
+    )
+    ax.errorbar(
+        rslist_big,
+        Measurements.value.(Fud2s),
+        Measurements.uncertainty.(Fud2s);
+        label="\$F^{\\uparrow\\downarrow}_2 \\xi^2\$",
+        capthick=1,
+        capsize=4,
+        fmt="o-",
+        ms=5,
+        color=cdict["blue"],
+    )
+    ax.errorbar(
+        rslist_big,
+        Measurements.value.(Fuutotals),
+        Measurements.uncertainty.(Fuutotals);
+        label="\$F^{\\uparrow\\uparrow}_1\\xi + F^{\\uparrow\\uparrow}_2 \\xi^2\$",
+        capthick=1,
+        capsize=4,
+        fmt="o-",
+        ms=5,
+        color=cdict["orange"],
+    )
+
+    # Our data
+    println("Fuu1s_ours = ", Fuu1s_ours)
+    println("Fuu2s_ours = ", Fuu2s_ours)
+    println("Fud2s_ours = ", Fud2s_ours)
+    println("Fuutotals_ours = ", Fuutotals_ours)
+    ax.scatter(rslist_small, Fuu1s_ours; color=cdict["grey"], label="\$F^{\\uparrow\\uparrow}_1 \\xi\$ (ours)")
+    ax.scatter(rslist_small, Fuu2s_ours; color=cdict["teal"], label="\$F^{\\uparrow\\uparrow}_2 \\xi^2\$ (ours)")
+    ax.scatter(rslist_small, Fud2s_ours; color=cdict["red"], label="\$F^{\\uparrow\\downarrow}_2 \\xi^2\$ (ours)")
+    ax.scatter(rslist_small, Fuutotals_ours; color=cdict["cyan"], label="\$F^{\\uparrow\\uparrow}_1\\xi + F^{\\uparrow\\uparrow}_2 \\xi^2\$ (ours)")
+
+    # ax.errorbar(
+    #     rslist_big,
+    #     Measurements.value.(Fudtotals),
+    #     Measurements.uncertainty.(Fudtotals);
+    #     label="\$F^{\\uparrow\\downarrow}_1\\xi + F^{\\uparrow\\downarrow}_2 \\xi^2\$",
+    #     capthick=1,
+    #     capsize=4,
+    #     fmt="o-",
+    #     ms=5,
+    #     color=cdict["magenta"],
+    # )
+    ax.set_xlabel("\$r_s\$")
+    # ax.set_ylabel("\$F^{\\sigma_1 \\sigma_2}\$")
+    if isDynamic == false
+        ax.set_ylim(-1.1, 2.2)
+    end
+    # ax.set_ylabel("\$F^s\$")
+    ax.legend(; ncol=2, fontsize=12, loc="best", columnspacing=0.5)
+    plt.tight_layout()
+    fig.savefig("oneshot_one_loop_F_uu_and_ud_yukawa_vs_rs$(interactionstr)_neft.pdf")
+    plt.close(fig)
+
+    fig, ax = plt.subplots(; figsize=(5, 5))
+    # NEFT benchmark
+    ax.errorbar(
+        rslist_big,
+        Measurements.value.(Fuu1s),
+        Measurements.uncertainty.(Fuu1s);
+        label="\$F^{\\uparrow\\uparrow}_1 \\xi\$",
+        capthick=1,
+        capsize=4,
+        fmt="o-",
+        ms=5,
+        color=cdict["black"],
+    )
+    ax.errorbar(
+        rslist_big,
+        Measurements.value.(Fuu2vpbs),
+        Measurements.uncertainty.(Fuu2vpbs);
+        label="\$F^{\\uparrow\\uparrow,\\text{b}+\\text{v}}_2 \\xi^2\$",
+        capthick=1,
+        capsize=4,
+        fmt="o-",
+        ms=5,
+        color=cdict["red"],
+    )
+    ax.errorbar(
+        rslist_big,
+        Measurements.value.(Fuu2cts),
+        Measurements.uncertainty.(Fuu2cts);
+        label="\$F^{\\uparrow\\uparrow,\\text{ct}}_2 \\xi^2\$",
+        capthick=1,
+        capsize=4,
+        fmt="o-",
+        ms=5,
+        color=cdict["blue"],
+    )
+    ax.errorbar(
+        rslist_big,
+        Measurements.value.(Fuu2s),
+        Measurements.uncertainty.(Fuu2s);
+        label="\$F^{\\uparrow\\uparrow}_2 \\xi^2\$",
+        capthick=1,
+        capsize=4,
+        fmt="o-",
+        ms=5,
+        color=cdict["magenta"],
+    )
+    ax.errorbar(
+        rslist_big,
+        Measurements.value.(Fuutotals),
+        Measurements.uncertainty.(Fuutotals);
+        label="\$F^{\\uparrow\\uparrow}_1\\xi + F^{\\uparrow\\uparrow}_2 \\xi^2\$",
+        capthick=1,
+        capsize=4,
+        fmt="o-",
+        ms=5,
+        color=cdict["orange"],
+    )
+
+    # Fuu2v + Fuu2b, ours
+    ax.scatter(rslist_small, Fuu2bs_ours .+ Fuu2vs_ours; color=cdict["teal"], label="\$F^{\\uparrow\\uparrow,\\text{b}+\\text{v}}_2 \\xi^2\$ (ours)")
+    ax.scatter(rslist_small, Fuu2cts_ours; color=cdict["cyan"], label="\$F^{\\uparrow\\uparrow,\\text{ct}}_2 \\xi^2\$ (ours)")
+
+    ax.set_xlabel("\$r_s\$")
+    # ax.set_ylabel("\$F^{\\sigma_1 \\sigma_2}\$")
+    # if isDynamic == false
+    #     ax.set_ylim(-1.4, 2.1)
+    # end
+    # ax.set_ylabel("\$F^s\$")
+    ax.legend(; ncol=2, fontsize=12, loc="best", columnspacing=0.5)
+    plt.tight_layout()
+    fig.savefig("oneshot_one_loop_F_uu_yukawa_vs_rs$(interactionstr)_neft.pdf")
+    plt.close(fig)
+
+    fig, ax = plt.subplots(; figsize=(5, 5))
+    # NEFT benchmark
+    # ax.errorbar(
+    #     rslist_big,
+    #     Measurements.value.(Fud1s),
+    #     Measurements.uncertainty.(Fud1s);
+    #     label="\$F^{\\uparrow\\downarrow}_1 \\xi\$",
+    #     capthick=1,
+    #     capsize=4,
+    #     fmt="o-",
+    #     ms=5,
+    #     color=cdict["black"],
+    # )
+    ax.errorbar(
+        rslist_big,
+        Measurements.value.(Fud2vpbs),
+        Measurements.uncertainty.(Fud2vpbs);
+        label="\$F^{\\uparrow\\downarrow,\\text{b}+\\text{v}}_2 \\xi^2\$",
+        capthick=1,
+        capsize=4,
+        fmt="o-",
+        ms=5,
+        color=cdict["red"],
+    )
+    ax.errorbar(
+        rslist_big,
+        Measurements.value.(Fud2cts),
+        Measurements.uncertainty.(Fud2cts);
+        label="\$F^{\\uparrow\\downarrow,\\text{ct}}_2 \\xi^2 = F^{\\uparrow\\downarrow}_2 \\xi^2\$",
+        capthick=1,
+        capsize=4,
+        fmt="o-",
+        ms=5,
+        color=cdict["blue"],
+    )
+
+    # Fud2v + Fud2b, ours
+    ax.scatter(rslist_small, Fud2bs_ours .+ Fud2vs_ours; color=cdict["teal"], label="\$F^{\\uparrow\\downarrow,\\text{b}+\\text{v}}_2 \\xi^2\$ (ours)")
+    ax.scatter(rslist_small, Fud2cts_ours; color=cdict["cyan"], label="\$F^{\\uparrow\\downarrow,\\text{ct}}_2 \\xi^2 = F^{\\uparrow\\downarrow}_2 \\xi^2\$ (ours)")
+
+    # ax.errorbar(
+    #     rslist_big,
+    #     Measurements.value.(Fud2s),
+    #     Measurements.uncertainty.(Fud2s);
+    #     label="\$F^{\\uparrow\\downarrow}_2 \\xi^2\$",
+    #     capthick=1,
+    #     capsize=4,
+    #     fmt="o--",
+    #     ms=5,
+    #     color=cdict["orange"],
+    # )
+    # ax.errorbar(
+    #     rslist_big,
+    #     Measurements.value.(Fudtotals),
+    #     Measurements.uncertainty.(Fudtotals);
+    #     label="\$F^{\\uparrow\\downarrow}_1\\xi + F^{\\uparrow\\downarrow}_2 \\xi^2\$",
+    #     capthick=1,
+    #     capsize=4,
+    #     fmt="o-",
+    #     ms=5,
+    #     color=cdict["orange"],
+    # )
+    ax.set_xlabel("\$r_s\$")
+    # ax.set_ylabel("\$F^{\\sigma_1 \\sigma_2}\$")
+    # if isDynamic == false
+    #     ax.set_ylim(-0.1, 2.2)
+    # end
+    # ax.set_ylabel("\$F^s\$")
+    ax.legend(; ncol=2, fontsize=12, loc="best", columnspacing=0.5)
+    plt.tight_layout()
+    fig.savefig("oneshot_one_loop_F_ud_yukawa_vs_rs$(interactionstr)_neft.pdf")
+    plt.close(fig)
+end
+
 function main()
     beta = 40.0
-    # rslist = [1, 10]
+    rslist = [0.01, 5, 10]
 
     # For fast Fa
-    rslist = [[0.01, 0.1, 0.5]; 1:2:10]
+    # rslist = [[0.01, 0.1, 0.5]; 1:2:10]
 
     # # Standard rslist
 
@@ -857,7 +1040,7 @@ function main()
     isDynamic = false
 
     # ftype = "Fs"  # f^{Di} + f^{Ex} / 2
-    ftype = "Fa"  # f^{Ex} / 2
+    # ftype = "Fa"  # f^{Ex} / 2
 
     # Plot NEFT benchmark data for F↑↑ and F↑↓ vs rs
     plot_F_uu_ud_NEFT(isDynamic, z_renorm)

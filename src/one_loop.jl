@@ -483,17 +483,18 @@ function get_yukawa_one_loop_neft(rslist, beta; neval=1e6, seed=1234)
         push!(Fud2s, F2totalud)
         GC.gc()
     end
-    return FsDMCs,
-    FaDMCs,
-    F1s,
-    Fuu1s,
-    Fud1s,
-    Fs2s,
-    Fa2s,
-    Fuu2vpbs,
-    Fud2vpbs,
-    Fuu2cts,
-    Fud2cts,
-    Fuu2s,
-    Fud2s
+    # return FsDMCs,
+    # FaDMCs,
+    # F1s,
+    # Fuu1s,
+    # Fud1s,
+    # Fs2s,
+    # Fa2s,
+    # Fuu2vpbs,
+    # Fud2vpbs,
+    # Fuu2cts,
+    # Fud2cts,
+    # Fuu2s,
+    # Fud2s
+    return Fuu1s, Fud1s, Fuu2vpbs, Fud2vpbs, Fuu2cts, Fud2cts, Fuu2s, Fud2s
 end

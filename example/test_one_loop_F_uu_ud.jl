@@ -35,7 +35,7 @@ function main()
     root = 0
     rank = MPI.Comm_rank(comm)
 
-    rslist = [1, 5, 10]
+    rslist = [0.01, 5, 10]
     beta = 40.0
 
     # For fast Fa
@@ -50,14 +50,14 @@ function main()
     z_renorm = false
     show_progress = true
 
-    run_neft = true
-    run_ours = false
+    run_neft = false
+    run_ours = true
 
     # Yukawa interaction
     isDynamic = false
 
-    ftype = "Fs"  # f^{Di} + f^{Ex} / 2
-    # ftype = "Fa"  # f^{Ex} / 2
+    # ftype = "Fs"  # f^{Di} + f^{Ex} / 2
+    ftype = "Fa"  # f^{Ex} / 2
 
     # nk ≈ na ≈ 100 is sufficiently converged for all relevant euv/rtol
     Nk, Ok = 7, 6
@@ -69,28 +69,17 @@ function main()
 
     # Calculate the one-loop results for F↑↑ and F↑↓ using NEFT and/or our code
     if run_neft
-        FsDMCs,
-        FaDMCs,
-        F1s,
-        Fuu1s,
-        Fud1s,
-        Fs2s,
-        Fa2s,
-        Fuu2vpbs,
-        Fud2vpbs,
-        Fuu2cts,
-        Fud2cts,
-        Fuu2s,
-        Fud2s = get_yukawa_one_loop_neft(rslist, beta; neval=1e7)
+        Fuu1s, Fud1s, Fuu2vpbs, Fud2vpbs, Fuu2cts, Fud2cts, Fuu2s, Fud2s =
+            get_yukawa_one_loop_neft(rslist, beta; neval=1e6)
 
-        FstotalNEFTs = F1s .+ Fs2s
-        FatotalNEFTs = F1s .+ Fa2s
-        FuutotalNEFTs = Fuu1s .+ Fuu2s
-        FudtotalNEFTs = Fud1s .+ Fud2s
+        Fuutotals = Fuu1s .+ Fuu2s
+        Fudtotals = Fud1s .+ Fud2s
 
         # Get Thomas-Fermi result for F1 using exact expression
         rs_exact = LinRange(0, 10, 1000)
         F1s_exact = get_F1_TF.(rs_exact)
+        Fuu1s_exact = 2 * F1s_exact
+        Fud1s_exact = zero(F1s_exact)
 
         # Get Thomas-Fermi result for F1 using exact expression
         function F2ct_exact(rs)
@@ -109,7 +98,7 @@ function main()
 
         # Save NEFT and exact results to np files
         if save && rank == root
-            @save "one_loop_F_neft.jld2" rslist FsDMCs FaDMCs FstotalNEFTs FatotalNEFTs Fuu2NEFTs Fud2NEFTs FuutotalNEFTs FudtotalNEFTs F1s_exact F2cts_exact Fuu1s Fud1s Fs2s Fa2s Fuu2vpbs Fud2vpbs Fuu2cts Fud2cts Fuu2s Fud2s
+            @save "one_loop_F_neft.jld2" rslist F1s_exact Fuu1s_exact Fud1s_exact F2cts_exact Fuu1s Fud1s Fuu2vpbs Fud2vpbs Fuu2cts Fud2cts Fuu2s Fud2s Fuutotals Fudtotals
         end
     end
     if run_ours
@@ -164,8 +153,8 @@ function main()
                 ftype=ftype,
                 z_renorm=z_renorm,
             )
-            push!(Fs_DMCs, Fs_DMC)
-            push!(Fa_DMCs, Fa_DMC)
+            # push!(Fs_DMCs, Fs_DMC)
+            # push!(Fa_DMCs, Fa_DMC)
             push!(F1s, F1)
             push!(F2vs, F2v)
             push!(F2bs, F2b)
@@ -176,7 +165,8 @@ function main()
         end
         # Save our results to np files
         if save && rank == root
-            @save "one_loop_$(ftype)_ours.jld2" rslist Fs_DMCs Fa_DMCs F1s F2vs F2bs F2cts F2zs F2s
+            # @save "one_loop_$(ftype)_ours.jld2" rslist Fs_DMCs Fa_DMCs F1s F2vs F2bs F2cts F2zs F2s
+            @save "one_loop_$(ftype)_ours.jld2" rslist F1s F2vs F2bs F2cts F2zs F2s
         end
     end
     MPI.Finalize()
