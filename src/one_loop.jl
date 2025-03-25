@@ -433,8 +433,8 @@ function get_yukawa_one_loop_neft(rslist, beta; neval=1e6, seed=1234)
         data, result = Ver4.MC_lavg(
             paramc;
             neval=neval,
-            l=[0],
             n=transferFrequencyIndices,
+            l=[0],
             filter=filters,
             partition=partitions,
             transferLoop=QPP,

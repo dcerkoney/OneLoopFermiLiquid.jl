@@ -67,18 +67,6 @@ function lerp(x, y, alpha)
 end
 
 """
-Fits a spline to the data (x, y) with weights e in the range [xmin, xmax].
-"""
-function spline(x, y, e; xmin=0.0, xmax=x[end])
-    # generate knots with spline without constraints
-    w = 1.0 ./ e
-    spl = interp.UnivariateSpline(x, y; w=w, k=3)
-    __x = collect(LinRange(xmin, xmax, 1000))
-    yfit = spl(__x)
-    return __x, yfit
-end
-
-"""
 The Lindhard function l(x) in terms of x = q / 2kF.
 """
 function lindhard(x)

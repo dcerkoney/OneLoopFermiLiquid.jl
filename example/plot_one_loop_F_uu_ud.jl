@@ -31,6 +31,18 @@ import FeynmanDiagram.FrontEnds: AnalyticProperty, Instant, Dynamic
 @pyimport scienceplots  # for style "science"
 @pyimport scipy.interpolate as interp
 
+"""
+Fits a spline to the data (x, y) with weights e in the range [xmin, xmax].
+"""
+function spline(x, y, e=1e-6 * one.(y); xmin=0.0, xmax=x[end])
+    # generate knots with spline without constraints
+    w = 1.0 ./ e
+    spl = interp.UnivariateSpline(x, y; w=w, k=3)
+    __x = collect(LinRange(xmin, xmax, 1000))
+    yfit = spl(__x)
+    return __x, yfit
+end
+
 # Vibrant qualitative colour scheme from https://personal.sron.nl/~pault/
 const cdict = Dict([
     "black" => "black",
@@ -729,14 +741,6 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     interactionstr = isDynamic ? "" : "_yukawa"
     zstr = z_renorm ? "_z_renorm" : ""
 
-    # nk ≈ na ≈ 100 is sufficiently converged for all relevant euv/rtol
-    Nk, Ok = 7, 6
-    Na, Oa = 8, 7
-
-    # DLR parameters for which r(q, 0) is smooth in the q → 0 limit (tested for rs = 1, 10)
-    euv = 10.0
-    rtol = 1e-7
-
     # Load NEFT benchmark data using jld2
     @load "one_loop_F_neft.jld2" rslist F1s_exact Fuu1s_exact Fud1s_exact F2cts_exact Fuu1s Fud1s Fuu2vpbs Fud2vpbs Fuu2cts Fud2cts Fuu2s Fud2s Fuutotals Fudtotals
     rslist_big = rslist
@@ -748,272 +752,301 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     Fs2vs = F2vs
     Fs2bs = F2bs
     Fs2cts = F2cts
-    Fs2zs = F2zs
     Fs2s = F2s
+    # Fs2zs = F2zs
     @load "one_loop_Fa_ours.jld2" rslist F1s F2vs F2bs F2cts F2zs F2s
     @assert rslist == rslist_small
     Fa1s = F1s
     Fa2vs = F2vs
     Fa2bs = F2bs
     Fa2cts = F2cts
-    Fa2zs = F2zs
     Fa2s = F2s
+    # Fa2zs = F2zs
 
     # Fs = (F↑↑ + F↑↓) / 2, Fa = (F↑↑ - F↑↓) / 2,
     # so F↑↑ = Fs + Fa, F↑↓ = Fs - Fa
-
-    Fuu1s_ours = Fs1s .+ Fa1s
-    Fud1s_ours = Fs1s .- Fa1s
-
-    Fuu2vs_ours = Fs2vs .+ Fa2vs
-    Fud2vs_ours = Fs2vs .- Fa2vs
-
-    Fuu2bs_ours = Fs2bs .+ Fa2bs
-    Fud2bs_ours = Fs2bs .- Fa2bs
-
-    Fuu2cts_ours = Fs2cts .+ Fa2cts
-    Fud2cts_ours = Fs2cts .- Fa2cts
-
-    Fuu2s_ours = Fs2s .+ Fa2s
-    Fud2s_ours = Fs2s .- Fa2s
+    Fuu1s_ours, Fud1s_ours = Ver4.sa2ud(Fs1s, Fa1s)
+    Fuu2vs_ours, Fud2vs_ours = Ver4.sa2ud(Fs2vs, Fa2vs)
+    Fuu2bs_ours, Fud2bs_ours = Ver4.sa2ud(Fs2bs, Fa2bs)
+    Fuu2cts_ours, Fud2cts_ours = Ver4.sa2ud(Fs2cts, Fa2cts)
+    Fuu2s_ours, Fud2s_ours = Ver4.sa2ud(Fs2s, Fa2s)
+    # Fuu2zs_ours, Fud2zs_ours = Ver4.sa2ud(Fs2zs, Fa2zs)
 
     Fuutotals_ours = Fuu1s_ours .+ Fuu2s_ours
-    Fudtotals_ours = Fud1s_ours .+ Fud2s_ours
+    Fudtotals_ours = Fud1s_ours .+ Fud2s_ours  # F1↑↓ = 0
+
+    #########################
+    ### Fig 1: Fσσ' vs rs ###
+    #########################
 
     fig, ax = plt.subplots(; figsize=(5, 5))
     # NEFT benchmark
-    ax.errorbar(
-        rslist_big,
-        Measurements.value.(Fuu1s),
-        Measurements.uncertainty.(Fuu1s);
-        label="\$F^{\\uparrow\\uparrow}_1 \\xi\$",
-        capthick=1,
-        capsize=4,
-        fmt="o-",
-        ms=5,
+    mean = Measurements.value.(Fuu1s)
+    stddev = Measurements.uncertainty.(Fuu1s)
+    ax.plot(
+        spline(
+            rslist_big,
+            mean,
+            [25, 25, 25, 50, 50, 50, 50, 50, 50, 1000, 1000, 1000, 1000, 1000] .* stddev,
+        )...;
         color=cdict["black"],
+        linestyle="-",
+        label="\$F^{\\uparrow\\uparrow}_1 \\xi\$ (NEFT)",
+    )
+    mean = Measurements.value.(Fuu2s)
+    stddev = Measurements.uncertainty.(Fuu2s)
+    ax.plot(
+        spline(
+            rslist_big,
+            mean,
+            [25, 25, 25, 50, 50, 50, 50, 1000, 1000, 1000, 1000, 1000, 1000, 1000] .* stddev,
+        )...;
+        color=cdict["orange"],
+        linestyle="-",
+        label="\$F^{\\uparrow\\uparrow}_2 \\xi^2\$ (NEFT)",
+    )
+    mean = Measurements.value.(Fud2s)
+    stddev = Measurements.uncertainty.(Fud2s)
+    ax.plot(
+        spline(
+            rslist_big,
+            mean,
+            [25, 25, 25, 50, 50, 50, 50, 50, 50, 250, 250, 250, 250, 250] .* stddev,
+        )...;
+        color=cdict["magenta"],
+        linestyle="-",
+        label="\$F^{\\uparrow\\downarrow}_2 \\xi^2\$ (NEFT)",
     )
     # ax.errorbar(
     #     rslist_big,
-    #     Measurements.value.(Fud1s),
-    #     Measurements.uncertainty.(Fud1s);
-    #     label="\$F^{\\uparrow\\downarrow}_1 \\xi\$",
+    #     Measurements.value.(Fud2s),
+    #     Measurements.uncertainty.(Fud2s);
+    #     # label="\$F^{\\uparrow\\downarrow}_2 \\xi^2\$",
     #     capthick=1,
     #     capsize=4,
-    #     fmt="o-",
+    #     fmt="o",
     #     ms=5,
-    #     color=cdict["grey"],
+    #     color=cdict["magenta"],
     # )
-    ax.errorbar(
-        rslist_big,
-        Measurements.value.(Fuu2s),
-        Measurements.uncertainty.(Fuu2s);
-        label="\$F^{\\uparrow\\uparrow}_2 \\xi^2\$",
-        capthick=1,
-        capsize=4,
-        fmt="o-",
-        ms=5,
-        color=cdict["magenta"],
+    mean = Measurements.value.(Fuutotals)
+    stddev = Measurements.uncertainty.(Fuutotals)
+    ax.plot(
+        spline(
+            rslist_big,
+            mean,
+            [25, 25, 25, 50, 50, 50, 50, 50, 50, 1000, 1000, 1000, 1000, 1000] .* stddev,
+        )...;
+        color=cdict["red"],
+        linestyle="-",
+        label="\$F^{\\uparrow\\uparrow}_1\\xi + F^{\\uparrow\\uparrow}_2 \\xi^2\$ (NEFT)",
     )
-    ax.errorbar(
-        rslist_big,
-        Measurements.value.(Fud2s),
-        Measurements.uncertainty.(Fud2s);
-        label="\$F^{\\uparrow\\downarrow}_2 \\xi^2\$",
-        capthick=1,
-        capsize=4,
-        fmt="o-",
-        ms=5,
-        color=cdict["blue"],
-    )
-    ax.errorbar(
-        rslist_big,
-        Measurements.value.(Fuutotals),
-        Measurements.uncertainty.(Fuutotals);
-        label="\$F^{\\uparrow\\uparrow}_1\\xi + F^{\\uparrow\\uparrow}_2 \\xi^2\$",
-        capthick=1,
-        capsize=4,
-        fmt="o-",
-        ms=5,
-        color=cdict["orange"],
-    )
-
     # Our data
     println("Fuu1s_ours = ", Fuu1s_ours)
     println("Fuu2s_ours = ", Fuu2s_ours)
     println("Fud2s_ours = ", Fud2s_ours)
     println("Fuutotals_ours = ", Fuutotals_ours)
-    ax.scatter(rslist_small, Fuu1s_ours; color=cdict["grey"], label="\$F^{\\uparrow\\uparrow}_1 \\xi\$ (ours)")
-    ax.scatter(rslist_small, Fuu2s_ours; color=cdict["teal"], label="\$F^{\\uparrow\\uparrow}_2 \\xi^2\$ (ours)")
-    ax.scatter(rslist_small, Fud2s_ours; color=cdict["red"], label="\$F^{\\uparrow\\downarrow}_2 \\xi^2\$ (ours)")
-    ax.scatter(rslist_small, Fuutotals_ours; color=cdict["cyan"], label="\$F^{\\uparrow\\uparrow}_1\\xi + F^{\\uparrow\\uparrow}_2 \\xi^2\$ (ours)")
-
-    # ax.errorbar(
-    #     rslist_big,
-    #     Measurements.value.(Fudtotals),
-    #     Measurements.uncertainty.(Fudtotals);
-    #     label="\$F^{\\uparrow\\downarrow}_1\\xi + F^{\\uparrow\\downarrow}_2 \\xi^2\$",
-    #     capthick=1,
-    #     capsize=4,
-    #     fmt="o-",
-    #     ms=5,
-    #     color=cdict["magenta"],
-    # )
+    ax.plot(
+        spline(rslist_small, Fuu1s_ours;)...;
+        color=cdict["grey"],
+        label="\$F^{\\uparrow\\uparrow}_1 \\xi\$",
+    )
+    ax.plot(
+        spline(rslist_small, Fuu2s_ours;)...;
+        color=cdict["blue"],
+        label="\$F^{\\uparrow\\uparrow}_2 \\xi^2\$",
+    )
+    ax.plot(
+        spline(rslist_small, Fud2s_ours;)...;
+        color=cdict["cyan"],
+        label="\$F^{\\uparrow\\downarrow}_2 \\xi^2\$",
+    )
+    ax.plot(
+        spline(rslist_small, Fuutotals_ours;)...;
+        color=cdict["teal"],
+        label="\$F^{\\uparrow\\uparrow}_1\\xi + F^{\\uparrow\\uparrow}_2 \\xi^2\$",
+    )
     ax.set_xlabel("\$r_s\$")
     # ax.set_ylabel("\$F^{\\sigma_1 \\sigma_2}\$")
     if isDynamic == false
-        ax.set_ylim(-1.1, 2.2)
+        ax.set_ylim(-1.1, 2.6)
     end
+    ax.set_xlim(0, 10)
     # ax.set_ylabel("\$F^s\$")
     ax.legend(; ncol=2, fontsize=12, loc="best", columnspacing=0.5)
     plt.tight_layout()
     fig.savefig("oneshot_one_loop_F_uu_and_ud_yukawa_vs_rs$(interactionstr)_neft.pdf")
     plt.close(fig)
 
+    #########################
+    ### Fig 2: F2↑↑ vs rs ###
+    #########################
+
     fig, ax = plt.subplots(; figsize=(5, 5))
     # NEFT benchmark
-    ax.errorbar(
-        rslist_big,
-        Measurements.value.(Fuu1s),
-        Measurements.uncertainty.(Fuu1s);
-        label="\$F^{\\uparrow\\uparrow}_1 \\xi\$",
-        capthick=1,
-        capsize=4,
-        fmt="o-",
-        ms=5,
-        color=cdict["black"],
-    )
-    ax.errorbar(
-        rslist_big,
-        Measurements.value.(Fuu2vpbs),
-        Measurements.uncertainty.(Fuu2vpbs);
-        label="\$F^{\\uparrow\\uparrow,\\text{b}+\\text{v}}_2 \\xi^2\$",
-        capthick=1,
-        capsize=4,
-        fmt="o-",
-        ms=5,
-        color=cdict["red"],
-    )
-    ax.errorbar(
-        rslist_big,
-        Measurements.value.(Fuu2cts),
-        Measurements.uncertainty.(Fuu2cts);
-        label="\$F^{\\uparrow\\uparrow,\\text{ct}}_2 \\xi^2\$",
-        capthick=1,
-        capsize=4,
-        fmt="o-",
-        ms=5,
-        color=cdict["blue"],
-    )
-    ax.errorbar(
-        rslist_big,
-        Measurements.value.(Fuu2s),
-        Measurements.uncertainty.(Fuu2s);
-        label="\$F^{\\uparrow\\uparrow}_2 \\xi^2\$",
-        capthick=1,
-        capsize=4,
-        fmt="o-",
-        ms=5,
-        color=cdict["magenta"],
-    )
-    ax.errorbar(
-        rslist_big,
-        Measurements.value.(Fuutotals),
-        Measurements.uncertainty.(Fuutotals);
-        label="\$F^{\\uparrow\\uparrow}_1\\xi + F^{\\uparrow\\uparrow}_2 \\xi^2\$",
-        capthick=1,
-        capsize=4,
-        fmt="o-",
-        ms=5,
+    mean = Measurements.value.(Fuu2vpbs)
+    stddev = Measurements.uncertainty.(Fuu2vpbs)
+    ax.plot(
+        spline(
+            rslist_big,
+            mean,
+            [25, 25, 25, 50, 50, 50, 50, 50, 50, 1000, 1000, 1000, 1000, 1000] .* stddev,
+        )...;
         color=cdict["orange"],
+        linestyle="-",
+        label="\$F^{\\uparrow\\uparrow,\\text{b}+\\text{v}}_2 \\xi^2\$ (NEFT)",
     )
-
-    # Fuu2v + Fuu2b, ours
-    ax.scatter(rslist_small, Fuu2bs_ours .+ Fuu2vs_ours; color=cdict["teal"], label="\$F^{\\uparrow\\uparrow,\\text{b}+\\text{v}}_2 \\xi^2\$ (ours)")
-    ax.scatter(rslist_small, Fuu2cts_ours; color=cdict["cyan"], label="\$F^{\\uparrow\\uparrow,\\text{ct}}_2 \\xi^2\$ (ours)")
-
+    # ax.errorbar(
+    #     rslist_big,
+    #     mean,
+    #     stddev;
+    #     label="\$F^{\\uparrow\\uparrow,\\text{b}+\\text{v}}_2 \\xi^2\$ (NEFT)",
+    #     capthick=1,
+    #     capsize=4,
+    #     markersize=4,
+    #     markerfacecolor="none",
+    #     fmt="o",
+    #     color=cdict["orange"],
+    # )
+    mean = Measurements.value.(Fuu2cts)
+    stddev = Measurements.uncertainty.(Fuu2cts)
+    ax.plot(
+        spline(rslist_big, mean, 115 * stddev)...;
+        color=cdict["magenta"],
+        linestyle="-",
+        label="\$F^{\\uparrow\\uparrow,\\text{ct}}_2 \\xi^2\$ (NEFT)",
+    )
+    # ax.errorbar(
+    #     rslist_big,
+    #     mean,
+    #     stddev;
+    #     label="\$F^{\\uparrow\\uparrow,\\text{ct}}_2 \\xi^2\$ (NEFT)",
+    #     capthick=1,
+    #     capsize=4,
+    #     markersize=4,
+    #     markerfacecolor="none",
+    #     fmt="o",
+    #     color=cdict["magenta"],
+    # )
+    mean = Measurements.value.(Fuu2s)
+    stddev = Measurements.uncertainty.(Fuu2s)
+    ax.plot(
+        spline(rslist_big, mean, 75 * stddev)...;
+        color=cdict["red"],
+        linestyle="-",
+        label="\$F^{\\uparrow\\uparrow}_2 \\xi^2\$ (NEFT)",
+    )
+    # ax.errorbar(
+    #     rslist_big,
+    #     mean,
+    #     stddev;
+    #     label="\$F^{\\uparrow\\uparrow}_2 \\xi^2\$ (NEFT)",
+    #     capthick=1,
+    #     capsize=4,
+    #     markersize=4,
+    #     markerfacecolor="none",
+    #     fmt="o",
+    #     color=cdict["red"],
+    # )
+    # Ours
+    # ax.plot(
+    #     spline(rslist_small, Fuu2bs_ours;)...;
+    #     color=cdict["cyan"],
+    #     label="\$F^{\\uparrow\\uparrow,\\text{b}}_2 \\xi^2\$",
+    # )
+    # ax.scatter(rslist_small, Fuu2bs_ours; color=cdict["cyan"], s=4)
+    # ax.plot(
+    #     spline(rslist_small, Fuu2vs_ours;)...;
+    #     color=cdict["magenta"],
+    #     label="\$F^{\\uparrow\\uparrow,\\text{v}}_2 \\xi^2\$",
+    # )
+    # ax.scatter(rslist_small, Fuu2vs_ours; color=cdict["magenta"], s=4)
+    ax.plot(
+        spline(rslist_small, Fuu2bs_ours .+ Fuu2vs_ours;)...;
+        color=cdict["blue"],
+        label="\$F^{\\uparrow\\uparrow,\\text{b}+\\text{v}}_2 \\xi^2\$",
+    )
+    # ax.scatter(rslist_small, Fuu2bs_ours .+ Fuu2vs_ours; color=cdict["blue"], s=4)
+    ax.plot(
+        spline(rslist_small, Fuu2cts_ours;)...;
+        color=cdict["cyan"],
+        label="\$F^{\\uparrow\\uparrow,\\text{ct}}_2 \\xi^2\$",
+    )
+    # ax.scatter(rslist_small, Fuu2cts_ours; color=cdict["cyan"], s=4)
+    ax.plot(
+        spline(rslist_small, Fuu2s_ours;)...;
+        color=cdict["teal"],
+        label="\$F^{\\uparrow\\uparrow}_2 \\xi^2\$",
+    )
+    # ax.scatter(rslist_small, Fuu2s_ours; color=cdict["teal"], s=4)
     ax.set_xlabel("\$r_s\$")
     # ax.set_ylabel("\$F^{\\sigma_1 \\sigma_2}\$")
     # if isDynamic == false
     #     ax.set_ylim(-1.4, 2.1)
     # end
     # ax.set_ylabel("\$F^s\$")
+    ax.set_ylim(nothing, 0.98)
+    ax.set_xlim(0, 10)
     ax.legend(; ncol=2, fontsize=12, loc="best", columnspacing=0.5)
     plt.tight_layout()
-    fig.savefig("oneshot_one_loop_F_uu_yukawa_vs_rs$(interactionstr)_neft.pdf")
+    fig.savefig("oneshot_one_loop_F2_uu_yukawa_vs_rs$(interactionstr)_neft.pdf")
     plt.close(fig)
 
+    #########################
+    ### Fig 3: F2↑↓ vs rs ###
+    #########################
+
+    # NOTE: CTs are identically zero for F2↑↓ for both ours/NEFT!
     fig, ax = plt.subplots(; figsize=(5, 5))
     # NEFT benchmark
+    mean = Measurements.value.(Fud2vpbs)
+    stddev = 100 * Measurements.uncertainty.(Fud2vpbs)
+    ax.plot(
+        spline(rslist_big, mean, stddev)...;
+        color=cdict["orange"],
+        label="\$F^{\\uparrow\\downarrow,\\text{b}+\\text{v}}_2 \\xi^2\$ (NEFT)",
+        zorder=100,
+    )
     # ax.errorbar(
     #     rslist_big,
-    #     Measurements.value.(Fud1s),
-    #     Measurements.uncertainty.(Fud1s);
-    #     label="\$F^{\\uparrow\\downarrow}_1 \\xi\$",
+    #     Measurements.value.(Fud2vpbs),
+    #     Measurements.uncertainty.(Fud2vpbs);
+    #     label="\$F^{\\uparrow\\downarrow,\\text{b}+\\text{v}}_2 \\xi^2\$",
     #     capthick=1,
     #     capsize=4,
     #     fmt="o-",
     #     ms=5,
-    #     color=cdict["black"],
+    #     color=cdict["red"],
     # )
-    ax.errorbar(
-        rslist_big,
-        Measurements.value.(Fud2vpbs),
-        Measurements.uncertainty.(Fud2vpbs);
-        label="\$F^{\\uparrow\\downarrow,\\text{b}+\\text{v}}_2 \\xi^2\$",
-        capthick=1,
-        capsize=4,
-        fmt="o-",
-        ms=5,
-        color=cdict["red"],
-    )
-    ax.errorbar(
-        rslist_big,
-        Measurements.value.(Fud2cts),
-        Measurements.uncertainty.(Fud2cts);
-        label="\$F^{\\uparrow\\downarrow,\\text{ct}}_2 \\xi^2 = F^{\\uparrow\\downarrow}_2 \\xi^2\$",
-        capthick=1,
-        capsize=4,
-        fmt="o-",
-        ms=5,
+    # Ours
+    ax.plot(
+        spline(rslist_small, Fud2bs_ours .+ Fud2vs_ours)...;
         color=cdict["blue"],
+        label="\$F^{\\uparrow\\downarrow,\\text{b}+\\text{v}}_2 \\xi^2\$",
+        zorder=100,
     )
-
-    # Fud2v + Fud2b, ours
-    ax.scatter(rslist_small, Fud2bs_ours .+ Fud2vs_ours; color=cdict["teal"], label="\$F^{\\uparrow\\downarrow,\\text{b}+\\text{v}}_2 \\xi^2\$ (ours)")
-    ax.scatter(rslist_small, Fud2cts_ours; color=cdict["cyan"], label="\$F^{\\uparrow\\downarrow,\\text{ct}}_2 \\xi^2 = F^{\\uparrow\\downarrow}_2 \\xi^2\$ (ours)")
-
-    # ax.errorbar(
-    #     rslist_big,
-    #     Measurements.value.(Fud2s),
-    #     Measurements.uncertainty.(Fud2s);
-    #     label="\$F^{\\uparrow\\downarrow}_2 \\xi^2\$",
-    #     capthick=1,
-    #     capsize=4,
-    #     fmt="o--",
-    #     ms=5,
-    #     color=cdict["orange"],
-    # )
-    # ax.errorbar(
-    #     rslist_big,
-    #     Measurements.value.(Fudtotals),
-    #     Measurements.uncertainty.(Fudtotals);
-    #     label="\$F^{\\uparrow\\downarrow}_1\\xi + F^{\\uparrow\\downarrow}_2 \\xi^2\$",
-    #     capthick=1,
-    #     capsize=4,
-    #     fmt="o-",
-    #     ms=5,
-    #     color=cdict["orange"],
-    # )
-    ax.set_xlabel("\$r_s\$")
+    ax.plot(
+        spline(rslist_small, Fud2bs_ours)...;
+        color=cdict["cyan"],
+        label="\$F^{\\uparrow\\downarrow,\\text{b}}_2 \\xi^2\$",
+    )
+    ax.plot(
+        spline(rslist_small, Fud2vs_ours)...;
+        color=cdict["magenta"],
+        label="\$F^{\\uparrow\\downarrow,\\text{v}}_2 \\xi^2\$",
+    )
+    # ax.scatter(rslist_small, Fud2bs_ours; color=cdict["teal"], label="\$F^{\\uparrow\\downarrow,\\text{b}}_2 \\xi^2\$ (ours)")
+    # ax.scatter(rslist_small, Fud2vs_ours; color=cdict["teal"], label="\$F^{\\uparrow\\downarrow,\\text{v}}_2 \\xi^2\$ (ours)")
+    # ax.scatter(rslist_small, Fud2bs_ours .+ Fud2vs_ours; color=cdict["teal"], label="\$F^{\\uparrow\\downarrow,\\text{b}+\\text{v}}_2 \\xi^2\$ (ours)")
+    # ax.set_xlabel("\$r_s\$")
     # ax.set_ylabel("\$F^{\\sigma_1 \\sigma_2}\$")
     # if isDynamic == false
     #     ax.set_ylim(-0.1, 2.2)
     # end
     # ax.set_ylabel("\$F^s\$")
-    ax.legend(; ncol=2, fontsize=12, loc="best", columnspacing=0.5)
+    ax.set_xlim(0, 10)
+    ax.legend(; ncol=1, fontsize=12, loc="best", columnspacing=0.5)
     plt.tight_layout()
-    fig.savefig("oneshot_one_loop_F_ud_yukawa_vs_rs$(interactionstr)_neft.pdf")
+    fig.savefig("oneshot_one_loop_F2_ud_yukawa_vs_rs$(interactionstr)_neft.pdf")
     plt.close(fig)
 end
 
