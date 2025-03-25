@@ -321,6 +321,45 @@ function get_one_loop_Fs(
     return one_loop_total(param, verbose; kwargs...)
 end
 
+function get_one_loop_diagrams(rs, beta, mass2=0.0, Fs=0.0)
+    # One-loop => only interaction-type counterterms
+    partitions = UEG.partition(1; offset=0)  # TEST: G-type counterterms should be removed by Diagram.diagram_parquet_response!
+
+    dummy_paramc = ElectronLiquid.ParaMC(;
+        rs=rs,
+        beta=beta,
+        Fs=Fs,
+        order=1,
+        mass2=mass2,
+        isDynamic=false,
+    )
+
+    # NOTE: we need to include the bubble diagram, as it will be cancelled numerically by the interaction counterterm
+    filters = [Proper, NoHartree]  # Proper => only exchange and box-type direct diagrams contribute to F₂
+
+    # Setup forward-scattering extK and zero transfer momentum ((Q,Ω) → 0 limit)
+    KinL, KoutL, KinR, KoutR = zeros(16), zeros(16), zeros(16), zeros(16)
+    KinL[1] = KoutL[1] = 1  # k1  →  k1
+    KinR[2] = KoutR[2] = 1  # k2 →  k2
+    QPP = KinL - KoutL        # Q = 0
+    extKPP = (KinL, KoutL, KinR, KoutR)
+
+    # NOTE: The above definitions for Q/extK use chan=:PP conventions!
+    diagrams = Diagram.diagram_parquet_response(
+        :vertex4,
+        dummy_paramc,
+        partitions;
+        chan=:PP,
+        filter=filters,
+        transferLoop=QPP,  # (Q,Ω) → 0
+        extK=extKPP,
+    )
+
+    # returns: (partition, diagpara, FeynGraphs, extT_labels, spin_conventions)
+    # graphs contain: {{↑↑ diags}, {↑↓ diags}}
+    return diagrams
+end
+
 """
 Benchmark for the one-loop calculation of F for the Yukawa-type theory using the NEFT toolbox.
 """
@@ -328,45 +367,37 @@ function get_yukawa_one_loop_neft(rslist, beta; neval=1e6, seed=1234)
     # One-loop => only interaction-type counterterms
     partitions = UEG.partition(1; offset=0)  # TEST: G-type counterterms should be removed by Diagram.diagram_parquet_response!
 
-    dummy_paramc = ElectronLiquid.ParaMC(;
-        rs=0.01,
-        beta=beta,
-        Fs=0.0,
-        order=1,
-        mass2=0.0,
-        isDynamic=false,
-    )
-
     # NOTE: we need to include the bubble diagram, as it will be cancelled numerically by the interaction counterterm
-    filter = [Proper, NoHartree]  # Proper => only exchange and box-type direct diagrams contribute to F₂
+    filters = [Proper, NoHartree]  # Proper => only exchange and box-type direct diagrams contribute to F₂
 
     # Setup forward-scattering extK and zero transfer momentum ((Q,Ω) → 0 limit)
     KinL, KoutL, KinR, KoutR = zeros(16), zeros(16), zeros(16), zeros(16)
-    KinL[1] = KoutL[1] = 1  # k  →  k
-    KinR[2] = KoutR[2] = 1  # k' →  k'
-    Q = KinL - KoutL        # Q = 0
-    extK = (KinL, KoutL, KinR, KoutR)
+    KinL[1] = KoutL[1] = 1  # k1  →  k1
+    KinR[2] = KoutR[2] = 1  # k2 →  k2
+    QPP = KinL - KoutL        # Q = 0
+    extKPP = (KinL, KoutL, KinR, KoutR)
 
-    # returns: (partition, diagpara, FeynGraphs, extT_labels, spin_conventions)
-    # graphs contain: {{↑↑ diags}, {↑↓ diags}}
-    diagrams = Diagram.diagram_parquet_response(
-        :vertex4,
-        dummy_paramc,
-        partitions;
-        filter=filter,
-        transferLoop=Q,
-        extK=extK,
-    )
-    graphs = diagrams[3]
-    isUpUp =
-        Dict(P => [g.properties.response == UpUp for g in graphs[P]] for P in keys(graphs))
-    isUpDown = Dict(
-        P => [g.properties.response == UpDown for g in graphs[P]] for P in keys(graphs)
-    )
-    println("Tree-level computational graphs from Diagram.diagram_parquet_response:")
-    print_tree(graphs)
-    println("isUpUp: $isUpUp")
-    println("isUpDown: $isUpDown")
+    # TODO: Determine which of these is correct (matters for dynamic interactions!)
+    #       with -1, we have a transfer frequency of iν₁ = i2πT, and with all zeros,
+    #       we have iν₀ = 0.
+    noTransferMomentum = true
+    if noTransferMomentum
+        transferFrequencyIndices = [0, 0, 0]
+    else
+        transferFrequencyIndices = [-1, 0, 0]
+    end
+
+    # diagrams = get_one_loop_graphs(0.01, beta)
+    # graphs = diagrams[3]
+    # isUpUp =
+    #     Dict(P => [g.properties.response == UpUp for g in graphs[P]] for P in keys(graphs))
+    # isUpDown = Dict(
+    #     P => [g.properties.response == UpDown for g in graphs[P]] for P in keys(graphs)
+    # )
+    # println("Tree-level computational graphs from Diagram.diagram_parquet_response:")
+    # print_tree(graphs)
+    # println("isUpUp: $isUpUp")
+    # println("isUpDown: $isUpDown")
 
     FsDMCs = []
     FaDMCs = []
@@ -399,102 +430,93 @@ function get_yukawa_one_loop_neft(rslist, beta; neval=1e6, seed=1234)
         println_root("F+ from DMC: $(Fs_DMC), F- from DMC: $(Fa_DMC)")
 
         ########## test l=0 PH averged Yukawa interaction ############
-        data, result = Ver4.lavg(
-            paramc,
-            diagrams;
+        data, result = Ver4.MC_lavg(
+            paramc;
             neval=neval,
             l=[0],
-            n=[0, 0, 0],
-            # n=[-1, 0, 0],
+            n=transferFrequencyIndices,
+            filter=filters,
+            partition=partitions,
+            transferLoop=QPP,
+            extK=extKPP,
             seed=seed,
             print=-1,
+            chan=:PP,
         )
 
-        # (0, 0, 0)
-        obs_tl = real(data[partitions[1]])
+        # # diagrams = get_one_loop_diagrams(rs, beta, qTF^2)
 
-        # (1, 0, 0)
-        obs = real(data[partitions[2]])
+        # reweight_goal = Float64[]
+        # for (order, sOrder, vOrder) in partition
+        #     # push!(reweight_goal, 8.0^(order + vOrder - 1))
+        #     push!(reweight_goal, 8.0^(order - 1))
+        # end
+        # push!(reweight_goal, 1.0)
 
-        # NOTE: data[partitions[4]] = data[(0, 1, 0)] is empty (no non-zero diagrams)
+        # partition = diagram[1] # diagram like (1, 1, 0) is absent, so the partition will be modified
+        # println(partition)
+        # neighbor = UEG.neighbor(partition)
 
-        # (0, 0, 1)
-        obs_ict = real(data[partitions[4]])
+        # data, result = Ver4.lavg(
+        #     paramc,
+        #     diagrams;
+        #     neval=neval,
+        #     l=[0],
+        #     # n=[0, 0, 0],
+        #     n=[-1, 0, 0, -1],
+        #     seed=seed,
+        #     print=-1,
+        #     neighbor=neighbor,
+        #     reweight_goal=reweight_goal,
+        # )
 
-        println(data)
-        # println(length(obs_tl))
-        # println(length(obs_ict))
-        # println(length(obs))
+        if isnothing(data) == false
+            # tree-level
+            # NOTE: overall sign is wrong for tree-level (V -> -V)
+            # F1uu, F1ud = -1 .* real(data[partitions[1]])
+            F1uu, F1ud = real(data[partitions[1]])
+            F1p, F1m = Ver4.ud2sa(F1uu, F1ud)
+            @assert F1p ≈ F1m "F1p = $F1p, F1m = $F1m (should be equal!)"
 
-        # @assert length(obs_tl) == length(obs_ict) == 1  # {↑↑Ins} (NOTE: ↑↓Ins is empty for Proper in filter)
-        # @assert length(obs)== 5                         # obs_ict = {PHr ↑↑Dyn, PPr ↑↑Dyn, PHEr ↑↑Dyn, PPr ↑↓Dyn, PHEr ↑↓Dyn} (NOTE: PHr ↑↓Dyn is empty for Proper in filter)
+            # one-loop counterterms
+            F2ctuu, F2ctud = real(data[partitions[2]])
+            F2ctp, F2ctm = Ver4.ud2sa(F2ctuu, F2ctud)
 
-        @assert length(obs_tl) == length(obs) == length(obs_ict) == 2  # {↑↑, ↑↓}
-        F1uu, F1ud = obs_tl
-        F2uu, F2ud = obs
-        F2ctuu, F2ctud = obs_ict
+            # one-loop diagrams
+            F2uu, F2ud = real(data[partitions[4]])
+            F2p, F2m = Ver4.ud2sa(F2uu, F2ud)
 
-        # F1uu = -isUpUp[partitions[1]]' * obs_tl
-        # F1ud = -isUpDown[partitions[1]]' * obs_tl
+            # NOTE: data[partitions[3]] = data[(0, 1, 0)] is empty (no non-zero diagrams)
+            println("(tree-level)\tup-up: $F1uu, up-down: $F1ud")
+            println("(one-loop diagrams)\tup-up: $F2uu, up-down: $F2ud")
+            println("(one-loop counterterms)\tup-up: $F2ctuu, up-down: $F2ctud")
 
-        # F2uu = -isUpUp[partitions[2]]' * obs
-        # F2ud = -isUpDown[partitions[2]]' * obs
+            F1 = F1p
+            F2s = F2p + F2ctp
+            F2a = F2m + F2ctm
+            F2totaluu = F2uu + F2ctuu
+            F2totalud = F2ud + F2ctud
 
-        # F2ctuu = -isUpUp[partitions[4]]' * obs_ict
-        # F2ctud = -isUpDown[partitions[4]]' * obs_ict
+            println("Fs = ($(F1))ξ + ($(F2s))ξ² + O(ξ³)")
+            println("Fa = ($(F1))ξ + ($(F2a))ξ² + O(ξ³)")
+            println("F↑↑ = ($(F1uu))ξ + ($(F2totaluu))ξ² + O(ξ³)")
+            println("F↑↓ = ($(F1ud))ξ + ($(F2totalud))ξ² + O(ξ³)")
 
-        println("(tree-level)\tup-up: $F1uu, up-down: $F1ud")
-        println("(one-loop diagrams)\tup-up: $F2uu, up-down: $F2ud")
-        println("(one-loop counterterms)\tup-up: $F2ctuu, up-down: $F2ctud")
-
-        Fp(Fuu, Fud) = (Fuu + Fud) / 2
-        Fm(Fuu, Fud) = (Fuu - Fud) / 2
-
-        F1p = Fp(F1uu, F1ud)
-        F1m = Fm(F1uu, F1ud)
-        F1 = F1p
-        @assert F1p ≈ F1m "F1p = $F1p, F1m = $F1m (should be equal!)"
-
-        F2p = Fp(F2uu, F2ud)
-        F2m = Fm(F2uu, F2ud)
-        F2ctp = Fp(F2ctuu, F2ctud)
-        F2ctm = Fm(F2ctuu, F2ctud)
-        F2s = F2p + F2ctp
-        F2a = F2m + F2ctm
-        F2totaluu = F2uu + F2ctuu
-        F2totalud = F2ud + F2ctud
-        println("Fs = ($(F1))ξ + ($(F2s))ξ² + O(ξ³)")
-        println("Fa = ($(F1))ξ + ($(F2a))ξ² + O(ξ³)")
-        println("F↑↑ = ($(F1uu))ξ + ($(F2totaluu))ξ² + O(ξ³)")
-        println("F↑↓ = ($(F1ud))ξ + ($(F2totalud))ξ² + O(ξ³)")
-
-        push!(FsDMCs, Fs_DMC)
-        push!(FaDMCs, Fa_DMC)
-        push!(F1s, F1)
-        push!(Fuu1s, F1uu)
-        push!(Fud1s, F1ud)
-        push!(Fs2s, F2s)
-        push!(Fa2s, F2a)
-        push!(Fuu2vpbs, F2uu)
-        push!(Fud2vpbs, F2ud)
-        push!(Fuu2cts, F2ctuu)
-        push!(Fud2cts, F2ctud)
-        push!(Fuu2s, F2totaluu)
-        push!(Fud2s, F2totalud)
-        GC.gc()
+            push!(FsDMCs, Fs_DMC)
+            push!(FaDMCs, Fa_DMC)
+            push!(F1s, F1)
+            push!(Fuu1s, F1uu)
+            push!(Fud1s, F1ud)
+            push!(Fs2s, F2s)
+            push!(Fa2s, F2a)
+            push!(Fuu2vpbs, F2uu)
+            push!(Fud2vpbs, F2ud)
+            push!(Fuu2cts, F2ctuu)
+            push!(Fud2cts, F2ctud)
+            push!(Fuu2s, F2totaluu)
+            push!(Fud2s, F2totalud)
+            GC.gc()
+        end
     end
-    # return FsDMCs,
-    # FaDMCs,
-    # F1s,
-    # Fuu1s,
-    # Fud1s,
-    # Fs2s,
-    # Fa2s,
-    # Fuu2vpbs,
-    # Fud2vpbs,
-    # Fuu2cts,
-    # Fud2cts,
-    # Fuu2s,
-    # Fud2s
     return Fuu1s, Fud1s, Fuu2vpbs, Fud2vpbs, Fuu2cts, Fud2cts, Fuu2s, Fud2s
 end

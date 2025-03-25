@@ -35,14 +35,13 @@ function main()
     root = 0
     rank = MPI.Comm_rank(comm)
 
-    rslist = [0.01, 5, 10]
     beta = 40.0
 
-    # For fast Fa
+    # # For fast runs
     # rslist = [[0.01, 0.1, 0.5]; 1:2:10]
 
-    # # Standard rslist
-    # rslist = [[0.01, 0.1, 0.25, 0.5]; 1:1:10]
+    # Standard rslist
+    rslist = [[0.01, 0.1, 0.25, 0.5]; 1:1:10]
 
     save = true
     debug = true
@@ -50,14 +49,15 @@ function main()
     z_renorm = false
     show_progress = true
 
-    run_neft = false
+    run_neft = true
     run_ours = true
 
     # Yukawa interaction
     isDynamic = false
 
-    # ftype = "Fs"  # f^{Di} + f^{Ex} / 2
-    ftype = "Fa"  # f^{Ex} / 2
+    ftypes = ["Fs", "Fa"]
+    # ftypes = ["Fs"]  # f^{Di} + f^{Ex} / 2
+    # ftypes = ["Fa"]  # f^{Ex} / 2
 
     # nk ≈ na ≈ 100 is sufficiently converged for all relevant euv/rtol
     Nk, Ok = 7, 6
@@ -70,7 +70,7 @@ function main()
     # Calculate the one-loop results for F↑↑ and F↑↓ using NEFT and/or our code
     if run_neft
         Fuu1s, Fud1s, Fuu2vpbs, Fud2vpbs, Fuu2cts, Fud2cts, Fuu2s, Fud2s =
-            get_yukawa_one_loop_neft(rslist, beta; neval=1e6)
+            get_yukawa_one_loop_neft(rslist, beta; neval=1e8)
 
         Fuutotals = Fuu1s .+ Fuu2s
         Fudtotals = Fud1s .+ Fud2s
@@ -98,75 +98,76 @@ function main()
 
         # Save NEFT and exact results to np files
         if save && rank == root
+            @assert all(
+                isempty(meas) == false for
+                meas in [Fuu1s, Fud1s, Fuu2vpbs, Fud2vpbs, Fuu2cts, Fud2cts, Fuu2s, Fud2s]
+            )
             @save "one_loop_F_neft.jld2" rslist F1s_exact Fuu1s_exact Fud1s_exact F2cts_exact Fuu1s Fud1s Fuu2vpbs Fud2vpbs Fuu2cts Fud2cts Fuu2s Fud2s Fuutotals Fudtotals
         end
     end
     if run_ours
-        Fs_DMCs = []
-        Fa_DMCs = []
-        F1s = []
-        F2vs = []
-        F2bs = []
-        F2cts = []
-        F2zs = []
-        F2s = []
-        for (i, rs) in enumerate(rslist)
-            if debug && rank == root
-                testdlr(rs, euv, rtol; verbose=verbose)
-            end
-            basic_param = Parameter.rydbergUnit(1.0 / beta, rs, 3)
-            mass2 = isDynamic ? 1e-5 : basic_param.qTF^2
-            Fs_DMC = -get_Fs_DMC(basic_param)
-            Fa_DMC = -get_Fa_DMC(basic_param)
-            println_root("\nrs = $rs:")
-            println_root("F+ from DMC: $(Fs_DMC)")
-            param = OneLoopParams(;
-                rs=rs,
-                beta=beta,
-                Fs=Fs_DMC,
-                euv=euv,
-                rtol=rtol,
-                Nk=Nk,
-                Ok=Ok,
-                Na=Na,
-                Oa=Oa,
-                isDynamic=isDynamic,
-                mass2=mass2,
-            )
-            if debug && rank == root && rs > 0.25
-                check_sign_Fs(param)
-                check_signs_Fs_Fa(rs, Fs_DMC, Fa_DMC)
-            end
-            if verbose && rank == root && i == 1
-                println_root("nk=$(length(param.qgrid)), na=$(length(param.θgrid))")
-                println_root("nk=$(length(param.qgrid)), na=$(length(param.θgrid))")
-                println_root("euv=$(param.euv), rtol=$(param.rtol)")
-                println_root(
-                    "\nrs=$(param.rs), beta=$(param.beta), Fs=$(Fs_DMC), Fa=$(Fa_DMC)",
+        for ftype in ["Fs", "Fa"]
+            F1s = []
+            F2vs = []
+            F2bs = []
+            F2cts = []
+            F2zs = []
+            F2s = []
+            for (i, rs) in enumerate(rslist)
+                if debug && rank == root
+                    testdlr(rs, euv, rtol; verbose=verbose)
+                end
+                basic_param = Parameter.rydbergUnit(1.0 / beta, rs, 3)
+                mass2 = isDynamic ? 1e-5 : basic_param.qTF^2
+                Fs_DMC = -get_Fs_DMC(basic_param)
+                Fa_DMC = -get_Fa_DMC(basic_param)
+                println_root("\nrs = $rs:")
+                println_root("F+ from DMC: $(Fs_DMC)")
+                param = OneLoopParams(;
+                    rs=rs,
+                    beta=beta,
+                    Fs=Fs_DMC,
+                    euv=euv,
+                    rtol=rtol,
+                    Nk=Nk,
+                    Ok=Ok,
+                    Na=Na,
+                    Oa=Oa,
+                    isDynamic=isDynamic,
+                    mass2=mass2,
                 )
+                if debug && rank == root && rs > 0.25
+                    check_sign_Fs(param)
+                    check_signs_Fs_Fa(rs, Fs_DMC, Fa_DMC)
+                end
+                if verbose && rank == root && i == 1
+                    println_root("nk=$(length(param.qgrid)), na=$(length(param.θgrid))")
+                    println_root("nk=$(length(param.qgrid)), na=$(length(param.θgrid))")
+                    println_root("euv=$(param.euv), rtol=$(param.rtol)")
+                    println_root(
+                        "\nrs=$(param.rs), beta=$(param.beta), Fs=$(Fs_DMC), Fa=$(Fa_DMC)",
+                    )
+                end
+                initialize_one_loop_params!(param)  # precomputes the interaction interpoland r(q, iνₘ)
+                F1, F2v, F2b, F2ct, F2z, F2 = get_one_loop_Fs(
+                    param;
+                    verbose=verbose,
+                    show_progress=show_progress,
+                    ftype=ftype,
+                    z_renorm=z_renorm,
+                )
+                push!(F1s, F1)
+                push!(F2vs, F2v)
+                push!(F2bs, F2b)
+                push!(F2cts, F2ct)
+                push!(F2zs, F2z)
+                push!(F2s, F2)
+                GC.gc()
             end
-            initialize_one_loop_params!(param)  # precomputes the interaction interpoland r(q, iνₘ)
-            F1, F2v, F2b, F2ct, F2z, F2 = get_one_loop_Fs(
-                param;
-                verbose=verbose,
-                show_progress=show_progress,
-                ftype=ftype,
-                z_renorm=z_renorm,
-            )
-            # push!(Fs_DMCs, Fs_DMC)
-            # push!(Fa_DMCs, Fa_DMC)
-            push!(F1s, F1)
-            push!(F2vs, F2v)
-            push!(F2bs, F2b)
-            push!(F2cts, F2ct)
-            push!(F2zs, F2z)
-            push!(F2s, F2)
-            GC.gc()
-        end
-        # Save our results to np files
-        if save && rank == root
-            # @save "one_loop_$(ftype)_ours.jld2" rslist Fs_DMCs Fa_DMCs F1s F2vs F2bs F2cts F2zs F2s
-            @save "one_loop_$(ftype)_ours.jld2" rslist F1s F2vs F2bs F2cts F2zs F2s
+            # Save our results to np files
+            if save && rank == root
+                @save "one_loop_$(ftype)_ours.jld2" rslist F1s F2vs F2bs F2cts F2zs F2s
+            end
         end
     end
     MPI.Finalize()
