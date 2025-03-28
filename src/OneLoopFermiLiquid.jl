@@ -50,12 +50,22 @@ export box_matsubara_summand, box_matsubara_sum
 export direct_box_matsubara_summand, direct_box_matsubara_sum
 
 include("one_loop.jl")
-export initialize_one_loop_params!, get_one_loop_Fs, get_yukawa_one_loop_neft
+export initialize_one_loop_params!, get_one_loop_Fs, get_yukawa_one_loop_neft, get_one_loop_diagrams
 export one_loop_vertex_corrections,
     one_loop_box_diagrams, one_loop_direct_box_diagrams, one_loop_counterterms
 
 const alpha_ueg = (4 / 9π)^(1 / 3)
 export alpha_ueg
+
+function count_sum(g::Graph{F,W}) where {F,W}
+    res = 0
+    for sg in PostOrderDFS(g)
+        if haschildren(sg) && sg.operator == ComputationalGraphs.Sum
+            res += 1
+        end
+    end
+    return res
+end
 
 """
     lerp(M_start, M_end, alpha)

@@ -349,7 +349,6 @@ function get_one_loop_diagrams(rs, beta, mass2=0.0, Fs=0.0)
         :vertex4,
         dummy_paramc,
         partitions;
-        chan=:PP,
         filter=filters,
         transferLoop=QPP,  # (Q,Ω) → 0
         extK=extKPP,
