@@ -1,0 +1,18 @@
+digraph ComputationalGraph { 
+label=""
+ReturnNode[shape=box, label = "Return", style=filled, color=wheat3, fontsize=18]
+g19358[label=<<i>V</i><sub>1</sub>>, style=filled, color=lightcyan, fontsize=18]
+g19360[label=<<i>V</i><sub>2</sub>>, style=filled, color=lightcyan, fontsize=18]
+g19455[shape=box, label = <<b>&otimes;</b>>, style=filled, color=lightpink, fontsize=18, width = 0.5, height = 0.4]
+g19368[label=<<i>G</i><sub>3</sub>>, style=filled, color=lightcyan, fontsize=18]
+g19458[shape=box, label = <<b>&otimes;</b>>, style=filled, color=lightpink, fontsize=18, width = 0.5, height = 0.4]
+g19369[label=<<i>G</i><sub>4</sub>>, style=filled, color=lightcyan, fontsize=18]
+g19460[shape=box, label = <<b>&otimes;</b>>, style=filled, color=lightpink, fontsize=18, width = 0.5, height = 0.4]
+g19358->g19455[arrowhead=vee,penwidth = 0.2,arrowsize = 0.3]
+g19360->g19455[arrowhead=vee,penwidth = 0.2,arrowsize = 0.3]
+g19455->g19458[arrowhead=vee,label=-1.0,fontsize=16,penwidth = 0.2,arrowsize = 0.3]
+g19368->g19458[arrowhead=vee,penwidth = 0.2,arrowsize = 0.3]
+g19458->g19460[arrowhead=vee,penwidth = 0.2,arrowsize = 0.3]
+g19369->g19460[arrowhead=vee,penwidth = 0.2,arrowsize = 0.3]
+g19460->ReturnNode[arrowhead=vee, penwidth = 0.2, arrowsize = 0.3]
+   }

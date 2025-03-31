@@ -226,7 +226,7 @@ end
 """
 Calculates and returns the total counterterm contribution to F2:
 
-    2R(z1 - f1 Π0) - f1 Π0 f1
+    2R(z1 - f1 Π0) - f1 Π0 f1 (+ R Π0 R)
 """
 function one_loop_counterterms(param::OneLoopParams; kwargs...)
     @unpack rs, kF, EF, NF, Fs, basic, isDynamic = param
@@ -267,6 +267,28 @@ function one_loop_counterterms(param::OneLoopParams; kwargs...)
     return vertex_cts
 end
 
+function one_loop_bubble_counterterm(param::OneLoopParams; kwargs...)
+    @unpack rs, kF, EF, NF, Fs, basic, isDynamic = param
+    if isDynamic == false
+        @assert param.mass2 ≈ param.qTF^2 "Counterterms currently only implemented for the Thomas-Fermi interaction (Yukawa mass = qTF)!"
+    end
+    rstilde = rs * alpha_ueg / π
+
+    # x = |k - k'| / 2kF
+    xgrid = CompositeGrid.LogDensedGrid(:gauss, [0.0, 1.0], [0.0, 1.0], 16, 1e-8, 16)
+
+    # x R(2kF x, 0)
+    x_NF2_R2 = isDynamic ? x_NF2_R02 : x_NF2_VTF2
+    x_R02 = [x_NF2_R2(x, rstilde, Fs) / NF^2 for x in xgrid]
+
+    # Π₀(q, iν=0) = -NF * 𝓁(q / 2kF)
+    Π0 = -NF * lindhard.(xgrid)
+
+    # NF ⟨R Π₀ R⟩
+    bubble_ct = Interp.integrate1D(NF .* x_R02 .* Π0, xgrid)
+    return bubble_ct
+end
+
 """
 Calculates and returns all tree-level (F₁) and one-loop (F₂) contributions to F.
 """
@@ -291,6 +313,9 @@ function get_one_loop_Fs(
             F2ct = real(one_loop_counterterms(param; kwargs...))
             println_root("F2ct = ($(F2ct))ξ²")
 
+            F2ctb = real(one_loop_bubble_counterterm(param; kwargs...))
+            println_root("F2ctb = ($(F2ctb))ξ²")
+
             # z²⟨Γ⟩ = (1 + z₁ξ + ...)²⟨Γ⟩ = 2z₁F₁ξ²
             if z_renorm
                 z1 = get_Z1(param)
@@ -302,12 +327,13 @@ function get_one_loop_Fs(
 
             F2 = F2v + F2b + F2ct + F2z
             println_root("F2 = ($(F1))ξ + ($(F2))ξ²")
-            return F1, F2v, F2b, F2ct, F2z, F2
+            return F1, F2v, F2b, F2ct, F2ctb, F2z, F2
         else
             F1 = get_F1(param)
             F2v = real(one_loop_vertex_corrections(param; kwargs...))
             F2b = real(one_loop_box_diagrams(param; kwargs...))
             F2ct = real(one_loop_counterterms(param; kwargs...))
+            F2ctb = real(one_loop_bubble_counterterm(param; kwargs...))
             if z_renorm
                 z1 = get_Z1(param)
                 F2z = 2 * z1 * F1
@@ -315,13 +341,13 @@ function get_one_loop_Fs(
                 F2z = 0.0
             end
             F2 = F2v + F2b + F2ct + F2z
-            return F1, F2v, F2b, F2ct, F2z, F2
+            return F1, F2v, F2b, F2ct, F2ctb, F2z, F2
         end
     end
     return one_loop_total(param, verbose; kwargs...)
 end
 
-function get_one_loop_diagrams(rs, beta, mass2=0.0, Fs=0.0)
+function get_one_loop_diagrams(rs, beta, mass2=0.0, Fs=0.0, chan=:PH, remove_bubble=true)
     # One-loop => only interaction-type counterterms
     partitions = UEG.partition(1; offset=0)  # TEST: G-type counterterms should be removed by Diagram.diagram_parquet_response!
 
@@ -334,24 +360,31 @@ function get_one_loop_diagrams(rs, beta, mass2=0.0, Fs=0.0)
         isDynamic=false,
     )
 
-    # NOTE: we need to include the bubble diagram, as it will be cancelled numerically by the interaction counterterm
-    filters = [Proper, NoHartree]  # Proper => only exchange and box-type direct diagrams contribute to F₂
+    # Proper => only exchange and box-type direct diagrams contribute to F₂
+    filters = remove_bubble ? [Proper, NoHartree, NoBubble] : [Proper, NoHartree]
+
+    # PP loopBasis: (k1, k2, Q - k1, ...)
+    # PH loopBasis: (k1, k1 + Q, k2, ...)
+    if chan == :PP
+        idx_k1, idx_k2 = 1, 2
+    else
+        idx_k1, idx_k2 = 1, 3
+    end
 
     # Setup forward-scattering extK and zero transfer momentum ((Q,Ω) → 0 limit)
     KinL, KoutL, KinR, KoutR = zeros(16), zeros(16), zeros(16), zeros(16)
-    KinL[1] = KoutL[1] = 1  # k1  →  k1
-    KinR[2] = KoutR[2] = 1  # k2 →  k2
-    QPP = KinL - KoutL        # Q = 0
-    extKPP = (KinL, KoutL, KinR, KoutR)
+    KinL[idx_k1] = KoutL[idx_k1] = 1  # k1  →  k1
+    KinR[idx_k2] = KoutR[idx_k2] = 1  # k2 →  k2
+    Q = KinL - KoutL        # Q = 0
+    extK = (KinL, KoutL, KinR, KoutR)
 
-    # NOTE: The above definitions for Q/extK use chan=:PP conventions!
     diagrams = Diagram.diagram_parquet_response(
         :vertex4,
         dummy_paramc,
         partitions;
         filter=filters,
-        transferLoop=QPP,  # (Q,Ω) → 0
-        extK=extKPP,
+        transferLoop=Q,  # (Q,Ω) → 0
+        extK=extK,
     )
 
     # returns: (partition, diagpara, FeynGraphs, extT_labels, spin_conventions)
@@ -362,19 +395,27 @@ end
 """
 Benchmark for the one-loop calculation of F for the Yukawa-type theory using the NEFT toolbox.
 """
-function get_yukawa_one_loop_neft(rslist, beta; neval=1e6, seed=1234)
+function get_yukawa_one_loop_neft(rslist, beta; neval=1e6, seed=1234, chan=:PH, remove_bubble=true)
     # One-loop => only interaction-type counterterms
     partitions = UEG.partition(1; offset=0)  # TEST: G-type counterterms should be removed by Diagram.diagram_parquet_response!
 
-    # NOTE: we need to include the bubble diagram, as it will be cancelled numerically by the interaction counterterm
-    filters = [Proper, NoHartree]  # Proper => only exchange and box-type direct diagrams contribute to F₂
+    # Proper => only exchange and box-type direct diagrams contribute to F₂
+    filters = remove_bubble ? [Proper, NoHartree, NoBubble] : [Proper, NoHartree]
+
+    # PP loopBasis: (k1, k2, Q - k1, ...)
+    # PH loopBasis: (k1, k1 + Q, k2, ...)
+    if chan == :PP
+        idx_k1, idx_k2 = 1, 2
+    else
+        idx_k1, idx_k2 = 1, 3
+    end
 
     # Setup forward-scattering extK and zero transfer momentum ((Q,Ω) → 0 limit)
     KinL, KoutL, KinR, KoutR = zeros(16), zeros(16), zeros(16), zeros(16)
-    KinL[1] = KoutL[1] = 1  # k1  →  k1
-    KinR[2] = KoutR[2] = 1  # k2 →  k2
-    QPP = KinL - KoutL        # Q = 0
-    extKPP = (KinL, KoutL, KinR, KoutR)
+    KinL[idx_k1] = KoutL[idx_k1] = 1  # k1  →  k1
+    KinR[idx_k2] = KoutR[idx_k2] = 1  # k2 →  k2
+    transferLoop = KinL - KoutL       # Q = 0
+    extK = (KinL, KoutL, KinR, KoutR)
 
     # TODO: Determine which of these is correct (matters for dynamic interactions!)
     #       with -1, we have a transfer frequency of iν₁ = i2πT, and with all zeros,
@@ -436,11 +477,11 @@ function get_yukawa_one_loop_neft(rslist, beta; neval=1e6, seed=1234)
             l=[0],
             filter=filters,
             partition=partitions,
-            transferLoop=QPP,
-            extK=extKPP,
+            transferLoop=transferLoop,
+            extK=extK,
             seed=seed,
             print=-1,
-            chan=:PP,
+            chan=chan,
         )
 
         # # diagrams = get_one_loop_diagrams(rs, beta, qTF^2)

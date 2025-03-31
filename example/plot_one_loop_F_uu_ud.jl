@@ -738,28 +738,49 @@ end
 function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     # ftypestr = ftype == "Fs" ? "F^{s}" : "F^{a}"
 
+    # NEFT tree-level data is missing an overall minus sign (change sign convention for F)
+    neft_factor_tree_level = -1.0
+    neft_factor_one_loop = 1.0
+
+    remove_bubble = false
+    neft_splines = false
+    chan = :PH
+    
+    bubblestr = remove_bubble ? "no_bubble_" : ""
     interactionstr = isDynamic ? "" : "_yukawa"
     zstr = z_renorm ? "_z_renorm" : ""
 
     # Load NEFT benchmark data using jld2
-    @load "one_loop_F_neft.jld2" rslist F1s_exact Fuu1s_exact Fud1s_exact F2cts_exact Fuu1s Fud1s Fuu2vpbs Fud2vpbs Fuu2cts Fud2cts Fuu2s Fud2s Fuutotals Fudtotals
+    @load "one_loop_F_neft_$(bubblestr)$(chan).jld2" rslist F1s_exact Fuu1s_exact Fud1s_exact F2cts_exact Fuu1s Fud1s Fuu2vpbs Fud2vpbs Fuu2cts Fud2cts Fuu2s Fud2s Fuutotals Fudtotals
     rslist_big = rslist
+    Fuu1s *= neft_factor_tree_level
+    Fud1s *= neft_factor_tree_level
+    Fuu2vpbs *= neft_factor_one_loop
+    Fud2vpbs *= neft_factor_one_loop
+    Fuu2cts *= neft_factor_one_loop
+    Fud2cts *= neft_factor_one_loop
+    Fuu2s *= neft_factor_one_loop
+    Fud2s *= neft_factor_one_loop
+    Fuutotals *= neft_factor_one_loop
+    Fudtotals *= neft_factor_one_loop
 
     # Load our data using jld2
-    @load "one_loop_Fs_ours.jld2" rslist F1s F2vs F2bs F2cts F2zs F2s
+    @load "one_loop_Fs_ours.jld2" rslist F1s F2vs F2bs F2cts F2ctbs F2zs F2s
     rslist_small = rslist
     Fs1s = F1s
     Fs2vs = F2vs
     Fs2bs = F2bs
-    Fs2cts = F2cts
+    Fs2cts = -F2cts
+    Fs2ctbs = -F2ctbs ./ 2
     Fs2s = F2s
     # Fs2zs = F2zs
-    @load "one_loop_Fa_ours.jld2" rslist F1s F2vs F2bs F2cts F2zs F2s
+    @load "one_loop_Fa_ours.jld2" rslist F1s F2vs F2bs F2cts F2ctbs F2zs F2s
     @assert rslist == rslist_small
     Fa1s = F1s
     Fa2vs = F2vs
     Fa2bs = F2bs
-    Fa2cts = F2cts
+    Fa2cts = -F2cts
+    Fa2ctbs = -F2ctbs ./ 2
     Fa2s = F2s
     # Fa2zs = F2zs
 
@@ -769,6 +790,7 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     Fuu2vs_ours, Fud2vs_ours = Ver4.sa2ud(Fs2vs, Fa2vs)
     Fuu2bs_ours, Fud2bs_ours = Ver4.sa2ud(Fs2bs, Fa2bs)
     Fuu2cts_ours, Fud2cts_ours = Ver4.sa2ud(Fs2cts, Fa2cts)
+    Fuu2ctbs_ours, Fud2ctbs_ours = Ver4.sa2ud(Fs2ctbs, Fa2ctbs)
     Fuu2s_ours, Fud2s_ours = Ver4.sa2ud(Fs2s, Fa2s)
     # Fuu2zs_ours, Fud2zs_ours = Ver4.sa2ud(Fs2zs, Fa2zs)
 
@@ -779,44 +801,37 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     ### Fig 1: Fσσ' vs rs ###
     #########################
 
+    plotdata(x, y, e) = neft_splines ? spline(x, y, 50 * e) : (x, y)
+
     fig, ax = plt.subplots(; figsize=(5, 5))
     # NEFT benchmark
     mean = Measurements.value.(Fuu1s)
     stddev = Measurements.uncertainty.(Fuu1s)
     ax.plot(
-        spline(
-            rslist_big,
-            mean,
-            [25, 25, 25, 50, 50, 50, 50, 50, 50, 1000, 1000, 1000, 1000, 1000] .* stddev,
-        )...;
+        plotdata(rslist_big, mean, stddev)...;
         color=cdict["black"],
-        linestyle="-",
+        linestyle="--",
         label="\$F^{\\uparrow\\uparrow}_1 \\xi\$ (NEFT)",
     )
+    ax.scatter(rslist_big, mean; color=cdict["black"], s=4)
     mean = Measurements.value.(Fuu2s)
     stddev = Measurements.uncertainty.(Fuu2s)
     ax.plot(
-        spline(
-            rslist_big,
-            mean,
-            [25, 25, 25, 50, 50, 50, 50, 1000, 1000, 1000, 1000, 1000, 1000, 1000] .* stddev,
-        )...;
+        plotdata(rslist_big, mean, stddev)...;
         color=cdict["orange"],
-        linestyle="-",
+        linestyle="--",
         label="\$F^{\\uparrow\\uparrow}_2 \\xi^2\$ (NEFT)",
     )
+    ax.scatter(rslist_big, mean; color=cdict["orange"], s=4)
     mean = Measurements.value.(Fud2s)
     stddev = Measurements.uncertainty.(Fud2s)
     ax.plot(
-        spline(
-            rslist_big,
-            mean,
-            [25, 25, 25, 50, 50, 50, 50, 50, 50, 250, 250, 250, 250, 250] .* stddev,
-        )...;
+        plotdata(rslist_big, mean, stddev)...;
         color=cdict["magenta"],
-        linestyle="-",
+        linestyle="--",
         label="\$F^{\\uparrow\\downarrow}_2 \\xi^2\$ (NEFT)",
     )
+    ax.scatter(rslist_big, mean; color=cdict["magenta"], s=4)
     # ax.errorbar(
     #     rslist_big,
     #     Measurements.value.(Fud2s),
@@ -834,47 +849,53 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
         spline(
             rslist_big,
             mean,
-            [25, 25, 25, 50, 50, 50, 50, 50, 50, 1000, 1000, 1000, 1000, 1000] .* stddev,
+            50 * stddev,
+            # [25, 25, 25, 50, 50, 50, 50, 50, 50, 1000, 1000, 1000, 1000, 1000] .* stddev,
         )...;
         color=cdict["red"],
-        linestyle="-",
+        linestyle="--",
         label="\$F^{\\uparrow\\uparrow}_1\\xi + F^{\\uparrow\\uparrow}_2 \\xi^2\$ (NEFT)",
     )
+    ax.scatter(rslist_big, mean; color=cdict["red"], s=4)
     # Our data
     println("Fuu1s_ours = ", Fuu1s_ours)
     println("Fuu2s_ours = ", Fuu2s_ours)
     println("Fud2s_ours = ", Fud2s_ours)
     println("Fuutotals_ours = ", Fuutotals_ours)
     ax.plot(
-        spline(rslist_small, Fuu1s_ours;)...;
+        spline(rslist_small, Fuu1s_ours)...;
         color=cdict["grey"],
         label="\$F^{\\uparrow\\uparrow}_1 \\xi\$",
     )
     ax.plot(
-        spline(rslist_small, Fuu2s_ours;)...;
+        spline(rslist_small, Fuu2s_ours)...;
         color=cdict["blue"],
         label="\$F^{\\uparrow\\uparrow}_2 \\xi^2\$",
     )
     ax.plot(
-        spline(rslist_small, Fud2s_ours;)...;
+        spline(rslist_small, Fud2s_ours)...;
         color=cdict["cyan"],
         label="\$F^{\\uparrow\\downarrow}_2 \\xi^2\$",
     )
     ax.plot(
-        spline(rslist_small, Fuutotals_ours;)...;
+        spline(rslist_small, Fuutotals_ours)...;
         color=cdict["teal"],
         label="\$F^{\\uparrow\\uparrow}_1\\xi + F^{\\uparrow\\uparrow}_2 \\xi^2\$",
     )
     ax.set_xlabel("\$r_s\$")
     # ax.set_ylabel("\$F^{\\sigma_1 \\sigma_2}\$")
     if isDynamic == false
-        ax.set_ylim(-1.1, 2.6)
+        ymax = 3.2
+        ymin = -0.9
+        ax.set_ylim(ymin, ymax)
     end
     ax.set_xlim(0, 10)
     # ax.set_ylabel("\$F^s\$")
     ax.legend(; ncol=2, fontsize=12, loc="best", columnspacing=0.5)
     plt.tight_layout()
-    fig.savefig("oneshot_one_loop_F_uu_and_ud_yukawa_vs_rs$(interactionstr)_neft.pdf")
+    fig.savefig(
+        "oneshot_one_loop_F_uu_and_ud$(interactionstr)_vs_rs_$(bubblestr)$(chan)_neft.pdf",
+    )
     plt.close(fig)
 
     #########################
@@ -886,15 +907,12 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     mean = Measurements.value.(Fuu2vpbs)
     stddev = Measurements.uncertainty.(Fuu2vpbs)
     ax.plot(
-        spline(
-            rslist_big,
-            mean,
-            [25, 25, 25, 50, 50, 50, 50, 50, 50, 1000, 1000, 1000, 1000, 1000] .* stddev,
-        )...;
+        plotdata(rslist_big, mean, stddev)...;
         color=cdict["orange"],
-        linestyle="-",
+        linestyle="--",
         label="\$F^{\\uparrow\\uparrow,\\text{b}+\\text{v}}_2 \\xi^2\$ (NEFT)",
     )
+    ax.scatter(rslist_big, mean; color=cdict["orange"], s=4)
     # ax.errorbar(
     #     rslist_big,
     #     mean,
@@ -910,11 +928,12 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     mean = Measurements.value.(Fuu2cts)
     stddev = Measurements.uncertainty.(Fuu2cts)
     ax.plot(
-        spline(rslist_big, mean, 115 * stddev)...;
+        plotdata(rslist_big, mean, stddev)...;
         color=cdict["magenta"],
-        linestyle="-",
+        linestyle="--",
         label="\$F^{\\uparrow\\uparrow,\\text{ct}}_2 \\xi^2\$ (NEFT)",
     )
+    ax.scatter(rslist_big, mean; color=cdict["magenta"], s=4)
     # ax.errorbar(
     #     rslist_big,
     #     mean,
@@ -930,11 +949,12 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     mean = Measurements.value.(Fuu2s)
     stddev = Measurements.uncertainty.(Fuu2s)
     ax.plot(
-        spline(rslist_big, mean, 75 * stddev)...;
+        plotdata(rslist_big, mean, stddev)...;
         color=cdict["red"],
-        linestyle="-",
+        linestyle="--",
         label="\$F^{\\uparrow\\uparrow}_2 \\xi^2\$ (NEFT)",
     )
+    ax.scatter(rslist_big, mean; color=cdict["red"], s=4)
     # ax.errorbar(
     #     rslist_big,
     #     mean,
@@ -949,31 +969,43 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     # )
     # Ours
     # ax.plot(
-    #     spline(rslist_small, Fuu2bs_ours;)...;
+    #     spline(rslist_small, Fuu2bs_ours)...;
     #     color=cdict["cyan"],
     #     label="\$F^{\\uparrow\\uparrow,\\text{b}}_2 \\xi^2\$",
     # )
     # ax.scatter(rslist_small, Fuu2bs_ours; color=cdict["cyan"], s=4)
     # ax.plot(
-    #     spline(rslist_small, Fuu2vs_ours;)...;
+    #     spline(rslist_small, Fuu2vs_ours)...;
     #     color=cdict["magenta"],
     #     label="\$F^{\\uparrow\\uparrow,\\text{v}}_2 \\xi^2\$",
     # )
     # ax.scatter(rslist_small, Fuu2vs_ours; color=cdict["magenta"], s=4)
     ax.plot(
-        spline(rslist_small, Fuu2bs_ours .+ Fuu2vs_ours;)...;
+        spline(rslist_small, Fuu2bs_ours .+ Fuu2vs_ours)...;
         color=cdict["blue"],
         label="\$F^{\\uparrow\\uparrow,\\text{b}+\\text{v}}_2 \\xi^2\$",
     )
     # ax.scatter(rslist_small, Fuu2bs_ours .+ Fuu2vs_ours; color=cdict["blue"], s=4)
     ax.plot(
-        spline(rslist_small, Fuu2cts_ours;)...;
+        spline(rslist_small, Fuu2cts_ours)...;
         color=cdict["cyan"],
         label="\$F^{\\uparrow\\uparrow,\\text{ct}}_2 \\xi^2\$",
     )
+    ax.plot(
+        spline(rslist_big, Fuu2ctbs_ours)...;
+        color=cdict["grey"],
+        linestyle="-",
+        label="\$F^{\\uparrow\\uparrow,\\text{bct}}_2\\xi^2\$",
+    )
+    ax.plot(
+        spline(rslist_big, Fuu2cts_ours .+ Fuu2ctbs_ours)...;
+        color=cdict["black"],
+        linestyle="-",
+        label="\$F^{\\uparrow\\uparrow,\\text{ct+bct}}_2\\xi^2\$",
+    )
     # ax.scatter(rslist_small, Fuu2cts_ours; color=cdict["cyan"], s=4)
     ax.plot(
-        spline(rslist_small, Fuu2s_ours;)...;
+        spline(rslist_small, Fuu2s_ours)...;
         color=cdict["teal"],
         label="\$F^{\\uparrow\\uparrow}_2 \\xi^2\$",
     )
@@ -984,11 +1016,15 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     #     ax.set_ylim(-1.4, 2.1)
     # end
     # ax.set_ylabel("\$F^s\$")
-    ax.set_ylim(nothing, 0.98)
+    ymax = remove_bubble ? 1.55 : 0.98
+    ymin = remove_bubble ? -0.1 : nothing
+    ax.set_ylim(ymin, ymax)
     ax.set_xlim(0, 10)
     ax.legend(; ncol=2, fontsize=12, loc="best", columnspacing=0.5)
     plt.tight_layout()
-    fig.savefig("oneshot_one_loop_F2_uu_yukawa_vs_rs$(interactionstr)_neft.pdf")
+    fig.savefig(
+        "oneshot_one_loop_F2_uu$(interactionstr)_vs_rs_$(bubblestr)$(chan)_neft.pdf",
+    )
     plt.close(fig)
 
     #########################
@@ -999,13 +1035,15 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     fig, ax = plt.subplots(; figsize=(5, 5))
     # NEFT benchmark
     mean = Measurements.value.(Fud2vpbs)
-    stddev = 100 * Measurements.uncertainty.(Fud2vpbs)
+    stddev = Measurements.uncertainty.(Fud2vpbs)
     ax.plot(
-        spline(rslist_big, mean, stddev)...;
+        plotdata(rslist_big, mean, stddev)...;
         color=cdict["orange"],
+        linestyle="--",
         label="\$F^{\\uparrow\\downarrow,\\text{b}+\\text{v}}_2 \\xi^2\$ (NEFT)",
         zorder=100,
     )
+    ax.scatter(rslist_big, mean; color=cdict["orange"], s=4)
     # ax.errorbar(
     #     rslist_big,
     #     Measurements.value.(Fud2vpbs),
@@ -1046,13 +1084,15 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     ax.set_xlim(0, 10)
     ax.legend(; ncol=1, fontsize=12, loc="best", columnspacing=0.5)
     plt.tight_layout()
-    fig.savefig("oneshot_one_loop_F2_ud_yukawa_vs_rs$(interactionstr)_neft.pdf")
+    fig.savefig(
+        "oneshot_one_loop_F2_ud$(interactionstr)_vs_rs_$(bubblestr)$(chan)_neft.pdf",
+    )
     plt.close(fig)
 end
 
 function main()
     beta = 40.0
-    rslist = [0.01, 5, 10]
+    # rslist = [0.01, 5, 10]
 
     # For fast Fa
     # rslist = [[0.01, 0.1, 0.5]; 1:2:10]

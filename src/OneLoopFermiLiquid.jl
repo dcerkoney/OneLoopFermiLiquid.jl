@@ -42,7 +42,7 @@ export G0, r_interp
 
 include("tree_level.jl")
 export get_tree_level_self_consistent_Fs, get_F1, get_F1_TF, get_Z1
-export Σ1, integrand_F1, x_NF_R0, x_NF_VTF
+export Σ1, integrand_F1, x_NF_R0, x_NF_VTF, x_NF2_R02, x_NF2_VTF2
 
 include("matsubara_sums.jl")
 export vertex_matsubara_summand, vertex_matsubara_sum

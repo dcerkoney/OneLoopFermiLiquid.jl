@@ -118,3 +118,31 @@ function x_NF_VTF(x, rs_tilde, Fs=0.0)
     NF_times_VTF_ex = rs_tilde / (x^2 + rs_tilde)
     return x * NF_times_VTF_ex
 end
+
+"""
+Returns the integrand x * (r(x, 0))^2 in terms of x = |k_1 - k_2| / 2k_F.
+"""
+function x_NF2_R02(x, rs_tilde, Fs=0.0)
+    if isinf(rs_tilde)
+        return x / lindhard(x)^2
+    end
+    coeff = rs_tilde + Fs * x^2
+    # NF (R + f)
+    NF_times_Rpf_ex = coeff / (x^2 + coeff * lindhard(x))
+    # x (NF R)^2 = x (NF (R + f) - Fs)^2
+    NF_times_Rp_ex = NF_times_Rpf_ex - Fs
+    return x * NF_times_Rp_ex^2
+end
+
+"""
+Returns the integrand x * (r_TF(x, 0))^2 in terms of x = |k_1 - k_2| / 2k_F.
+"""
+function x_NF2_VTF2(x, rs_tilde, Fs=0.0)
+    if isinf(rs_tilde)
+        return x
+    elseif rs_tilde == 0
+        return 0.0
+    end
+    NF_times_VTF_ex = rs_tilde / (x^2 + rs_tilde)
+    return x * NF_times_VTF_ex^2
+end

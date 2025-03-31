@@ -37,6 +37,8 @@ function main()
 
     beta = 40.0
 
+    # rslist = [2.0, 4.0, 6.0, 8.0] 
+
     # # For fast runs
     # rslist = [[0.01, 0.1, 0.5]; 1:2:10]
 
@@ -48,12 +50,16 @@ function main()
     verbose = true
     z_renorm = false
     show_progress = true
+    remove_bubble = false
+    chan = :PH  # or :PP — just an external leg convention, shouldn't affect the final result
 
     run_neft = true
-    run_ours = true
+    run_ours = false
 
     # Yukawa interaction
     isDynamic = false
+
+    bubblestr = remove_bubble ? "no_bubble_" : ""
 
     ftypes = ["Fs", "Fa"]
     # ftypes = ["Fs"]  # f^{Di} + f^{Ex} / 2
@@ -70,7 +76,7 @@ function main()
     # Calculate the one-loop results for F↑↑ and F↑↓ using NEFT and/or our code
     if run_neft
         Fuu1s, Fud1s, Fuu2vpbs, Fud2vpbs, Fuu2cts, Fud2cts, Fuu2s, Fud2s =
-            get_yukawa_one_loop_neft(rslist, beta; neval=1e8)
+            get_yukawa_one_loop_neft(rslist, beta; neval=4e8, chan=chan, remove_bubble=remove_bubble)
 
         Fuutotals = Fuu1s .+ Fuu2s
         Fudtotals = Fud1s .+ Fud2s
@@ -102,7 +108,8 @@ function main()
                 isempty(meas) == false for
                 meas in [Fuu1s, Fud1s, Fuu2vpbs, Fud2vpbs, Fuu2cts, Fud2cts, Fuu2s, Fud2s]
             )
-            @save "one_loop_F_neft.jld2" rslist F1s_exact Fuu1s_exact Fud1s_exact F2cts_exact Fuu1s Fud1s Fuu2vpbs Fud2vpbs Fuu2cts Fud2cts Fuu2s Fud2s Fuutotals Fudtotals
+            @save "one_loop_F_neft_$(bubblestr)$(chan).jld2" rslist F1s_exact Fuu1s_exact Fud1s_exact F2cts_exact Fuu1s Fud1s Fuu2vpbs Fud2vpbs Fuu2cts Fud2cts Fuu2s Fud2s Fuutotals Fudtotals
+            # @save "one_loop_F_neft.jld2" rslist F1s_exact Fuu1s_exact Fud1s_exact F2cts_exact Fuu1s Fud1s Fuu2vpbs Fud2vpbs Fuu2cts Fud2cts Fuu2s Fud2s Fuutotals Fudtotals
         end
     end
     if run_ours
@@ -111,6 +118,7 @@ function main()
             F2vs = []
             F2bs = []
             F2cts = []
+            F2ctbs = []
             F2zs = []
             F2s = []
             for (i, rs) in enumerate(rslist)
@@ -149,7 +157,7 @@ function main()
                     )
                 end
                 initialize_one_loop_params!(param)  # precomputes the interaction interpoland r(q, iνₘ)
-                F1, F2v, F2b, F2ct, F2z, F2 = get_one_loop_Fs(
+                F1, F2v, F2b, F2ct, F2ctb, F2z, F2 = get_one_loop_Fs(
                     param;
                     verbose=verbose,
                     show_progress=show_progress,
@@ -160,13 +168,14 @@ function main()
                 push!(F2vs, F2v)
                 push!(F2bs, F2b)
                 push!(F2cts, F2ct)
+                push!(F2ctbs, F2ctb)
                 push!(F2zs, F2z)
                 push!(F2s, F2)
                 GC.gc()
             end
             # Save our results to np files
             if save && rank == root
-                @save "one_loop_$(ftype)_ours.jld2" rslist F1s F2vs F2bs F2cts F2zs F2s
+                @save "one_loop_$(ftype)_ours.jld2" rslist F1s F2vs F2bs F2cts F2ctbs F2zs F2s
             end
         end
     end
