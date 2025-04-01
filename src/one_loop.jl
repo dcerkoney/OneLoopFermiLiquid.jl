@@ -1,6 +1,6 @@
 
 """
-Calculates and returns the one-loop vertex corrections:
+Calculates and returns the one-loop vertex corrections (Fs2v, Fa2v):
 
     2 Λ₁(θ₁₂) r(|k₁ - k₂|, 0)
 """
@@ -69,18 +69,17 @@ function one_loop_vertex_corrections(param::OneLoopParams; show_progress=false)
     # Integrate over q
     k_m_kp = kF * sqrt(2 * (1 - cos(θ12)))
     # Fᵥ(θ₁₂) = Λ₁(θ₁₂) r(|k₁ - k₂|, 0)
-    result = Interp.integrate1D(vertex_integrand, qgrid) * r_interp(param, k_m_kp, 0)
-    return result
+    Fs2v = Fa2v = Interp.integrate1D(vertex_integrand, qgrid) * r_interp(param, k_m_kp, 0)
+    return Fs2v, Fa2v
 end
 
 """
-Calculates and returns all one-loop box diagrams:
+Calculates and returns all one-loop box diagrams (Fs2b, Fa2b):
 
     gg'RR' + exchange counterparts
 """
-function one_loop_box_diagrams(param::OneLoopParams; show_progress=false, ftype="fs")
+function one_loop_box_diagrams(param::OneLoopParams; show_progress=false)
     @assert param.initialized "r(q, iνₘ) data not yet initialized!"
-    @assert ftype in ["Fs", "Fa"]
     MPI.Init()
     root = 0
     comm = MPI.COMM_WORLD
@@ -91,11 +90,13 @@ function one_loop_box_diagrams(param::OneLoopParams; show_progress=false, ftype=
 
     # Initialize vertex integrand
     Nq = length(qgrid.grid)
-    q_integrand = zeros(ComplexF64, Nq)
+    q_integrand_s = zeros(ComplexF64, Nq)
+    q_integrand_a = zeros(ComplexF64, Nq)
 
     # Setup buffers for scatter/gather
     counts = split_count(Nq, comm_size)  # number of values per rank
-    data_vbuffer = VBuffer(q_integrand, counts)
+    data_vbuffer_s = VBuffer(q_integrand_s, counts)
+    data_vbuffer_a = VBuffer(q_integrand_a, counts)
     if rank == root
         length_ubuf = UBuffer(counts, 1)
         # For global indices
@@ -108,7 +109,10 @@ function one_loop_box_diagrams(param::OneLoopParams; show_progress=false, ftype=
     # Scatter the data to all ranks
     local_length = MPI.Scatter(length_ubuf, Int, root, comm)
     local_qi = MPI.Scatterv!(qi_vbuffer, zeros(Int, local_length), root, comm)
-    local_data = MPI.Scatterv!(data_vbuffer, zeros(ComplexF64, local_length), root, comm)
+    local_data_s =
+        MPI.Scatterv!(data_vbuffer_s, zeros(ComplexF64, local_length), root, comm)
+    local_data_a =
+        MPI.Scatterv!(data_vbuffer_a, zeros(ComplexF64, local_length), root, comm)
 
     # Compute the integrand over loop momentum magnitude q in parallel
     progress_meter = Progress(
@@ -118,32 +122,40 @@ function one_loop_box_diagrams(param::OneLoopParams; show_progress=false, ftype=
         showspeed=true,
         enabled=show_progress && rank == root,
     )
-    θ_integrand = Vector{ComplexF64}(undef, length(θgrid.grid))
-    φ_integrand = Vector{ComplexF64}(undef, length(φgrid.grid))
+    θs_integrand = Vector{ComplexF64}(undef, length(θgrid.grid))
+    θa_integrand = Vector{ComplexF64}(undef, length(θgrid.grid))
+    φs_integrand = Vector{ComplexF64}(undef, length(φgrid.grid))
+    φa_integrand = Vector{ComplexF64}(undef, length(φgrid.grid))
     for (i, qi) in enumerate(local_qi)
         # println("rank = $rank: Integrating (q, 0) point $i/$local_length")
         # Get external frequency and momentum at this index
         q = qgrid.grid[qi]
         for (iθ, θ) in enumerate(θgrid)
             for (iφ, φ) in enumerate(φgrid)
-                φ_integrand[iφ] = box_matsubara_sum(param, q, θ, φ; ftype=ftype)
+                φs_integrand[iφ] = box_matsubara_sum(param, q, θ, φ; ftype="Fs")
+                φa_integrand[iφ] = box_matsubara_sum(param, q, θ, φ; ftype="Fa")
             end
-            θ_integrand[iθ] = Interp.integrate1D(φ_integrand, φgrid)
+            θs_integrand[iθ] = Interp.integrate1D(φs_integrand, φgrid)
+            θa_integrand[iθ] = Interp.integrate1D(φa_integrand, φgrid)
         end
-        local_data[i] = Interp.integrate1D(θ_integrand .* sin.(θgrid.grid), θgrid)
+        local_data_s[i] = Interp.integrate1D(θ_integrand .* sin.(θgrid.grid), θgrid)
+        local_data_a[i] = Interp.integrate1D(θ_integrand .* sin.(θgrid.grid), θgrid)
         next!(progress_meter)
     end
     finish!(progress_meter)
 
     # Collect q_integrand subresults from all ranks
-    MPI.Allgatherv!(local_data, data_vbuffer, comm)
+    MPI.Allgatherv!(local_data_s, data_vbuffer_s, comm)
+    MPI.Allgatherv!(local_data_a, data_vbuffer_a, comm)
 
     # total integrand ~ NF
-    box_integrand = q_integrand / (NF * (2π)^3)
+    box_integrand_s = q_integrand_s / (NF * (2π)^3)
+    box_integrand_a = q_integrand_a / (NF * (2π)^3)
 
     # Integrate over q
-    result = Interp.integrate1D(box_integrand, qgrid)
-    return result
+    Fs2b = Interp.integrate1D(box_integrand_s, qgrid)
+    Fa2b = Interp.integrate1D(box_integrand_a, qgrid)
+    return Fs2b, Fa2b
 end
 
 """
@@ -224,7 +236,7 @@ function one_loop_direct_box_diagrams(
 end
 
 """
-Calculates and returns the total counterterm contribution to F2:
+Calculates and returns the total counterterm contribution to F2s and F2a:
 
     2R(z1 - f1 Π0) - f1 Π0 f1 (+ R Π0 R)
 """
@@ -251,10 +263,6 @@ function one_loop_counterterms(param::OneLoopParams; kwargs...)
     # Π₀(q, iν=0) = -NF * 𝓁(q / 2kF)
     Π0 = -NF * lindhard.(xgrid)
 
-    # BUGGY!
-    # # A = z₁ + 2 ∫₀¹ dx x R(x, 0) Π₀(x, 0)
-    # A = z1 + Interp.integrate1D(2 * x_R0 .* Π0, xgrid)
-
     # A = z₁ + ∫₀¹ dx x R(x, 0) Π₀(x, 0)
     A = z1 + Interp.integrate1D(x_R0 .* Π0, xgrid)
 
@@ -262,9 +270,8 @@ function one_loop_counterterms(param::OneLoopParams; kwargs...)
     B = Interp.integrate1D(xgrid .* Π0 / NF, xgrid)
 
     # (NF/2)*⟨2R(z1 - f1 Π0) - f1 Π0 f1⟩ = -2 F1 A - F1² B
-    vertex_cts = -(2 * F1 * A + F1^2 * B)
-    # vertex_cts = 2 * F1 * A + F1^2 * B
-    return vertex_cts
+    Fs2ct = Fa2ct = -(2 * F1 * A + F1^2 * B)
+    return Fs2ct, Fa2ct
 end
 
 function one_loop_bubble_counterterm(param::OneLoopParams; kwargs...)
@@ -285,66 +292,65 @@ function one_loop_bubble_counterterm(param::OneLoopParams; kwargs...)
     Π0 = -NF * lindhard.(xgrid)
 
     # NF ⟨R Π₀ R⟩
-    bubble_ct = Interp.integrate1D(NF .* x_R02 .* Π0, xgrid)
-    return bubble_ct
+    Fs2bct = Interp.integrate1D(NF .* x_R02 .* Π0, xgrid)
+    Fa2bct = 0.0  # bubble counterterm vanishes for direct diagrams (it is improper)
+    return Fs2bct, Fa2bct
 end
 
 """
-Calculates and returns all tree-level (F₁) and one-loop (F₂) contributions to F.
+Calculates and returns all tree-level (F₁) and one-loop (F₂) contributions to Fs2 and Fa2.
 """
-function get_one_loop_Fs(
-    param::OneLoopParams;
-    verbose=false,
-    ftype="Fs",
-    z_renorm=false,
-    kwargs...,
-)
-    function one_loop_total(param, verbose; kwargs...)
-        if verbose
-            F1 = param.isDynamic ? get_F1(param) : get_F1_TF(param.rs)
-            println_root("F1 = ($(F1))ξ")
+function get_one_loop_Fs(param::OneLoopParams; verbose=false, z_renorm=false, kwargs...)
+    Fs1 = Fa1 = get_F1(param)
+    F1 = (Fs1, Fa1)
 
-            F2v = real(one_loop_vertex_corrections(param; kwargs...))
-            println_root("F2v = ($(F2v))ξ²")
+    F2v = real.(one_loop_vertex_corrections(param; kwargs...))
+    F2b = real.(one_loop_box_diagrams(param; kwargs...))
+    # F2bubble = real.(one_loop_bubble_diagram(param; kwargs...))
 
-            F2b = real(one_loop_box_diagrams(param; ftype=ftype, kwargs...))
-            println_root("F2b = ($(F2b))ξ²")
+    F2ct = real.(one_loop_counterterms(param; kwargs...))
+    # F2bubblect = real.(one_loop_bubble_counterterm(param; kwargs...))
 
-            F2ct = real(one_loop_counterterms(param; kwargs...))
-            println_root("F2ct = ($(F2ct))ξ²")
-
-            F2ctb = real(one_loop_bubble_counterterm(param; kwargs...))
-            println_root("F2ctb = ($(F2ctb))ξ²")
-
-            # z²⟨Γ⟩ = (1 + z₁ξ + ...)²⟨Γ⟩ = 2z₁F₁ξ²
-            if z_renorm
-                z1 = get_Z1(param)
-                F2z = 2 * z1 * F1
-                println_root("F2z = ($(F2z))ξ²")
-            else
-                F2z = 0.0
-            end
-
-            F2 = F2v + F2b + F2ct + F2z
-            println_root("F2 = ($(F1))ξ + ($(F2))ξ²")
-            return F1, F2v, F2b, F2ct, F2ctb, F2z, F2
-        else
-            F1 = get_F1(param)
-            F2v = real(one_loop_vertex_corrections(param; kwargs...))
-            F2b = real(one_loop_box_diagrams(param; kwargs...))
-            F2ct = real(one_loop_counterterms(param; kwargs...))
-            F2ctb = real(one_loop_bubble_counterterm(param; kwargs...))
-            if z_renorm
-                z1 = get_Z1(param)
-                F2z = 2 * z1 * F1
-            else
-                F2z = 0.0
-            end
-            F2 = F2v + F2b + F2ct + F2z
-            return F1, F2v, F2b, F2ct, F2ctb, F2z, F2
-        end
+    # z²⟨Γ⟩ = (1 + z₁ξ + ...)²⟨Γ⟩ = 2z₁F₁ξ²
+    if z_renorm
+        z1 = get_Z1(param)
+        Fs2z = Fa2z = 2 * z1 * Fs1
+    else
+        Fs2z = Fa2z = 0.0
     end
-    return one_loop_total(param, verbose; kwargs...)
+    F2z = (Fs2z, Fa2z)
+
+    # Sum of all diagrams without counterterms
+    Fs2d = F2v[1] + F2b[1]
+    Fa2d = F2v[2] + F2b[2]
+    F2d = (Fs2d, Fa2d)
+
+    # Total contribution for F2 (O(ξ²) term)
+    Fs2 = F2v[1] + F2b[1] + F2ct[1] + F2z[1] # + F2bct[1]
+    Fa2 = F2v[2] + F2b[2] + F2ct[2] + F2z[2] # + F2bct[2]
+    F2 = (Fs2, Fa2)
+
+    # Total result for F to O(ξ²)
+    Fs = F1[1] + F2[1]
+    Fa = F1[2] + F2[2]
+    F = (Fs, Fa)
+
+    oneloop_sa = OneLoopResult(;
+        F1=F1,
+        F2v=F2v,
+        F2b=F2b,
+        # F2bubble=F2bubble,
+        F2d=F2d,
+        F2ct=F2ct,
+        # F2bubblect=F2bubblect,
+        F2z=F2z,
+        F2=F2,
+        F=F,
+    )
+    oneloop_ud = sa2ud(oneloop_sa)
+    verbose && println_root("(s, a):\n", oneloop_sa)
+    verbose && println_root("(↑↑, ↑↓):\n", oneloop_ud)
+    return oneloop_sa, oneloop_ud
 end
 
 function get_one_loop_diagrams(rs, beta, mass2=0.0, Fs=0.0, chan=:PH, remove_bubble=true)
@@ -394,13 +400,23 @@ end
 
 """
 Benchmark for the one-loop calculation of F for the Yukawa-type theory using the NEFT toolbox.
+To this end, we use the exactly-computed counterterms δ_R of the full theory with the replacement R = VTF,
+rather than the NEFT default δ_λ for static interactions.
 """
-function get_yukawa_one_loop_neft(rslist, beta; neval=1e6, seed=1234, chan=:PH, remove_bubble=true)
-    # One-loop => only interaction-type counterterms
-    partitions = UEG.partition(1; offset=0)  # TEST: G-type counterterms should be removed by Diagram.diagram_parquet_response!
+function get_yukawa_one_loop_neft(
+    rslist,
+    beta;
+    neval=1e6,
+    seed=1234,
+    chan=:PH,
+    z_renorm=false,
+)
+    # We calculate the counterterms and tree-level diagram exactly
+    partitions = [(1, 0, 0)]
 
     # Proper => only exchange and box-type direct diagrams contribute to F₂
-    filters = remove_bubble ? [Proper, NoHartree, NoBubble] : [Proper, NoHartree]
+    # Bubble diagram cancelled exactly in CTs => NoBubble
+    filters = [Proper, NoHartree, NoBubble]
 
     # PP loopBasis: (k1, k2, Q - k1, ...)
     # PH loopBasis: (k1, k1 + Q, k2, ...)
@@ -434,24 +450,9 @@ function get_yukawa_one_loop_neft(rslist, beta; neval=1e6, seed=1234, chan=:PH, 
     # isUpDown = Dict(
     #     P => [g.properties.response == UpDown for g in graphs[P]] for P in keys(graphs)
     # )
-    # println("Tree-level computational graphs from Diagram.diagram_parquet_response:")
-    # print_tree(graphs)
-    # println("isUpUp: $isUpUp")
-    # println("isUpDown: $isUpDown")
 
-    FsDMCs = []
-    FaDMCs = []
-    F1s = []
-    Fuu1s = []
-    Fud1s = []
-    Fs2s = []
-    Fa2s = []
-    Fuu2vpbs = []
-    Fud2vpbs = []
-    Fuu2cts = []
-    Fud2cts = []
-    Fuu2s = []
-    Fud2s = []
+    oneloop_neft_sa = []
+    oneloop_neft_ud = []
     for rs in rslist
         println("\nrs = $rs:")
         qTF = Parameter.rydbergUnit(1.0 / beta, rs, 3).qTF
@@ -464,12 +465,6 @@ function get_yukawa_one_loop_neft(rslist, beta; neval=1e6, seed=1234, chan=:PH, 
             isDynamic=false,
         )
         @unpack e0, NF, mass2, basic = paramc
-
-        Fs_DMC = -get_Fs_DMC(basic)
-        Fa_DMC = -get_Fa_DMC(basic)
-        println_root("F+ from DMC: $(Fs_DMC), F- from DMC: $(Fa_DMC)")
-
-        ########## test l=0 PH averged Yukawa interaction ############
         data, result = Ver4.MC_lavg(
             paramc;
             neval=neval,
@@ -483,80 +478,46 @@ function get_yukawa_one_loop_neft(rslist, beta; neval=1e6, seed=1234, chan=:PH, 
             print=-1,
             chan=chan,
         )
-
-        # # diagrams = get_one_loop_diagrams(rs, beta, qTF^2)
-
-        # reweight_goal = Float64[]
-        # for (order, sOrder, vOrder) in partition
-        #     # push!(reweight_goal, 8.0^(order + vOrder - 1))
-        #     push!(reweight_goal, 8.0^(order - 1))
-        # end
-        # push!(reweight_goal, 1.0)
-
-        # partition = diagram[1] # diagram like (1, 1, 0) is absent, so the partition will be modified
-        # println(partition)
-        # neighbor = UEG.neighbor(partition)
-
-        # data, result = Ver4.lavg(
-        #     paramc,
-        #     diagrams;
-        #     neval=neval,
-        #     l=[0],
-        #     # n=[0, 0, 0],
-        #     n=[-1, 0, 0, -1],
-        #     seed=seed,
-        #     print=-1,
-        #     neighbor=neighbor,
-        #     reweight_goal=reweight_goal,
-        # )
-
         if isnothing(data) == false
-            # tree-level
-            # NOTE: overall sign is wrong for tree-level (V -> -V)
-            # F1uu, F1ud = -1 .* real(data[partitions[1]])
-            F1uu, F1ud = real(data[partitions[1]])
-            F1p, F1m = Ver4.ud2sa(F1uu, F1ud)
-            @assert F1p ≈ F1m "F1p = $F1p, F1m = $F1m (should be equal!)"
-
-            # one-loop counterterms
-            F2ctuu, F2ctud = real(data[partitions[2]])
-            F2ctp, F2ctm = Ver4.ud2sa(F2ctuu, F2ctud)
-
-            # one-loop diagrams
-            F2uu, F2ud = real(data[partitions[4]])
-            F2p, F2m = Ver4.ud2sa(F2uu, F2ud)
-
-            # NOTE: data[partitions[3]] = data[(0, 1, 0)] is empty (no non-zero diagrams)
-            println("(tree-level)\tup-up: $F1uu, up-down: $F1ud")
-            println("(one-loop diagrams)\tup-up: $F2uu, up-down: $F2ud")
-            println("(one-loop counterterms)\tup-up: $F2ctuu, up-down: $F2ctud")
-
-            F1 = F1p
-            F2s = F2p + F2ctp
-            F2a = F2m + F2ctm
-            F2totaluu = F2uu + F2ctuu
-            F2totalud = F2ud + F2ctud
-
-            println("Fs = ($(F1))ξ + ($(F2s))ξ² + O(ξ³)")
-            println("Fa = ($(F1))ξ + ($(F2a))ξ² + O(ξ³)")
-            println("F↑↑ = ($(F1uu))ξ + ($(F2totaluu))ξ² + O(ξ³)")
-            println("F↑↓ = ($(F1ud))ξ + ($(F2totalud))ξ² + O(ξ³)")
-
-            push!(FsDMCs, Fs_DMC)
-            push!(FaDMCs, Fa_DMC)
-            push!(F1s, F1)
-            push!(Fuu1s, F1uu)
-            push!(Fud1s, F1ud)
-            push!(Fs2s, F2s)
-            push!(Fa2s, F2a)
-            push!(Fuu2vpbs, F2uu)
-            push!(Fud2vpbs, F2ud)
-            push!(Fuu2cts, F2ctuu)
-            push!(Fud2cts, F2ctud)
-            push!(Fuu2s, F2totaluu)
-            push!(Fud2s, F2totalud)
+            # one-loop diagrams from NEFT toolbox
+            F2d = real(data[partitions[1]])
+            # tree-level F1↑↑ and F1↑↓ calculated exactly
+            Fs1 = Fa1 = get_F1_TF(rs)
+            F1 = Ver4.sa2ud(Fs1, Fa1)  # = (2 * get_F1_TF(rs), 0.0)
+            # one-loop R-type counterterms calculated exactly
+            Fs2ct, Fa2ct = real.(one_loop_counterterms(param; kwargs...))
+            F2ct = Ver4.sa2ud(Fs2ct, Fa2ct)
+            # z²⟨Γ⟩ = (1 + z₁ξ + ...)²⟨Γ⟩ = 2z₁F₁ξ²
+            if z_renorm
+                z1 = get_Z1(param)
+                Fs2z = Fa2z = 2 * z1 * F1
+                F2z = (Fs2z, Fa2z)
+            else
+                F2z = (0.0, 0.0)
+            end
+            Fuu2 = F2d[1] + F2ct[1] + F2z[1]
+            F2ud = F2d[2] + F2ct[2] + F2z[2]
+            F2 = (Fuu2, F2ud)
+            Fuu = F1[1] + F2[1]
+            Fud = F1[2] + F2[2]
+            F = (Fuu, Fud)
+            oneloop_ud = OneLoopResult(;
+                F1=F1,
+                F2v=(NaN, NaN),
+                F2b=(NaN, NaN),
+                # F2bubble=(NaN, NaN),
+                F2d=F2d,
+                F2ct=F2ct,
+                # F2bubblect=(NaN, NaN),
+                F2z=F2z,
+                F2=F2,
+                F=F,
+            )
+            oneloop_sa = ud2sa(oneloop_ud)
+            push!(oneloop_neft_sa, oneloop_sa)
+            push!(oneloop_neft_ud, oneloop_ud)
             GC.gc()
         end
     end
-    return Fuu1s, Fud1s, Fuu2vpbs, Fud2vpbs, Fuu2cts, Fud2cts, Fuu2s, Fud2s
+    return oneloop_neft_sa, oneloop_neft_ud
 end

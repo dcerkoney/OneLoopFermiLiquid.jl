@@ -50,12 +50,65 @@ export box_matsubara_summand, box_matsubara_sum
 export direct_box_matsubara_summand, direct_box_matsubara_sum
 
 include("one_loop.jl")
-export initialize_one_loop_params!, get_one_loop_Fs, get_yukawa_one_loop_neft, get_one_loop_diagrams
+export initialize_one_loop_params!,
+    get_one_loop_Fs, get_yukawa_one_loop_neft, get_one_loop_diagrams
 export one_loop_vertex_corrections,
     one_loop_box_diagrams, one_loop_direct_box_diagrams, one_loop_counterterms
 
 const alpha_ueg = (4 / 9π)^(1 / 3)
 export alpha_ueg
+
+@with_kw struct OneLoopResult{T}
+    F1::Tuple{T,T}
+    F2v::Tuple{T,T}
+    F2b::Tuple{T,T}
+    # F2bubble::Tuple{T,T}
+    F2d::Tuple{T,T}
+    F2ct::Tuple{T,T}
+    # F2bubblect::Tuple{T, T}
+    F2z::Tuple{T,T}
+    F2::Tuple{T,T}
+    F::Tuple{T,T}
+end
+export OneLoopResult
+
+# Overload println for OneLoopResult
+function Base.println(io::IO, oneloop::OneLoopResult)
+    println(io, "OneLoopResult:")
+    println(io, "  F1 = ", oneloop.F1, "ξ²")
+    println(io, "  F2v = ", oneloop.F2v, "ξ²")
+    println(io, "  F2b = ", oneloop.F2b, "ξ²")
+    # println(io, "  F2bubble = ", oneloop.F2bubble, "ξ²")
+    println(io, "  F2d = ", oneloop.F2d, "ξ²")
+    println(io, "  F2ct = ", oneloop.F2ct, "ξ²")
+    # println(io, "  F2bubblect = ", oneloop.F2bubblect, "ξ²")
+    println(io, "  F2z = ", oneloop.F2z, "ξ²")
+    println(io, "  F2 = ", oneloop.F2, "ξ²")
+    println(io, "  F = ", oneloop.F1, "ξ + ", oneloop.F2, "ξ² + ...")
+end
+
+function map(func, oneloop::OneLoopResult)
+    return OneLoopResult(
+        func(oneloop.F1...),
+        func(oneloop.F2v...),
+        func(oneloop.F2b...),
+        # func(oneloop.F2bubble...),
+        func(oneloop.F2d...),
+        func(oneloop.F2ct...),
+        # func(oneloop.F2bubblect...),
+        func(oneloop.F2z...),
+        func(oneloop.F2...),
+        func(oneloop.F...),
+    )
+end
+
+function sa2ud(oneloop_sa::OneLoopResult)
+    return map(Ver4.sa2ud, oneloop_sa)
+end
+
+function ud2sa(oneloop_ud::OneLoopResult)
+    return map(Ver4.ud2sa, oneloop_ud)
+end
 
 function count_sum(g::Graph{F,W}) where {F,W}
     res = 0

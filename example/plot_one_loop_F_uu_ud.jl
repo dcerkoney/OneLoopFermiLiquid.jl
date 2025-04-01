@@ -750,13 +750,33 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     interactionstr = isDynamic ? "" : "_yukawa"
     zstr = z_renorm ? "_z_renorm" : ""
 
+    # Get Thomas-Fermi result for F1 using exact expression
+    rs_exact = LinRange(0, 10, 1000)
+    F1s_exact = get_F1_TF.(rs_exact)
+    Fuu1s_exact = 2 * F1s_exact
+    Fud1s_exact = zero(F1s_exact)
+
+    # Get Thomas-Fermi result for F2 using exact expression
+    function F2ct_exact(rs)
+        xgrid = CompositeGrid.LogDensedGrid(:gauss, [0.0, 1.0], [0.0, 1.0], 32, 1e-8, 32)
+        rstilde = rs * alpha_ueg / π
+        F1 = get_F1_TF(rs)
+        A = Interp.integrate1D(
+            lindhard.(xgrid) .* (xgrid * rstilde) ./ (xgrid .^ 2 .+ rstilde),
+            xgrid,
+        )
+        B = Interp.integrate1D(lindhard.(xgrid) .* xgrid, xgrid)
+        return 2 * F1 * A + F1^2 * B
+    end
+    F2cts_exact = F2ct_exact.(rs_exact)
+    
     # Load NEFT benchmark data using jld2
-    @load "one_loop_F_neft_$(bubblestr)$(chan).jld2" rslist F1s_exact Fuu1s_exact Fud1s_exact F2cts_exact Fuu1s Fud1s Fuu2vpbs Fud2vpbs Fuu2cts Fud2cts Fuu2s Fud2s Fuutotals Fudtotals
+    @load "one_loop_F_neft_$(bubblestr)$(chan).jld2" rslist F1s_exact Fuu1s_exact Fud1s_exact F2cts_exact Fuu1s Fud1s Fuu2ds Fud2ds Fuu2cts Fud2cts Fuu2s Fud2s Fuutotals Fudtotals
     rslist_big = rslist
     Fuu1s *= neft_factor_tree_level
     Fud1s *= neft_factor_tree_level
-    Fuu2vpbs *= neft_factor_one_loop
-    Fud2vpbs *= neft_factor_one_loop
+    Fuu2ds *= neft_factor_one_loop
+    Fud2ds *= neft_factor_one_loop
     Fuu2cts *= neft_factor_one_loop
     Fud2cts *= neft_factor_one_loop
     Fuu2s *= neft_factor_one_loop
@@ -904,8 +924,8 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
 
     fig, ax = plt.subplots(; figsize=(5, 5))
     # NEFT benchmark
-    mean = Measurements.value.(Fuu2vpbs)
-    stddev = Measurements.uncertainty.(Fuu2vpbs)
+    mean = Measurements.value.(Fuu2ds)
+    stddev = Measurements.uncertainty.(Fuu2ds)
     ax.plot(
         plotdata(rslist_big, mean, stddev)...;
         color=cdict["orange"],
@@ -1034,8 +1054,8 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     # NOTE: CTs are identically zero for F2↑↓ for both ours/NEFT!
     fig, ax = plt.subplots(; figsize=(5, 5))
     # NEFT benchmark
-    mean = Measurements.value.(Fud2vpbs)
-    stddev = Measurements.uncertainty.(Fud2vpbs)
+    mean = Measurements.value.(Fud2ds)
+    stddev = Measurements.uncertainty.(Fud2ds)
     ax.plot(
         plotdata(rslist_big, mean, stddev)...;
         color=cdict["orange"],
@@ -1046,8 +1066,8 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     ax.scatter(rslist_big, mean; color=cdict["orange"], s=4)
     # ax.errorbar(
     #     rslist_big,
-    #     Measurements.value.(Fud2vpbs),
-    #     Measurements.uncertainty.(Fud2vpbs);
+    #     Measurements.value.(Fud2ds),
+    #     Measurements.uncertainty.(Fud2ds);
     #     label="\$F^{\\uparrow\\downarrow,\\text{b}+\\text{v}}_2 \\xi^2\$",
     #     capthick=1,
     #     capsize=4,
