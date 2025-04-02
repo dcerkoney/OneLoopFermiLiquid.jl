@@ -74,7 +74,7 @@ function main()
     # Calculate the one-loop results for F↑↑ and F↑↓ using NEFT and/or our code
     if run_neft
         oneloop_sa_neft, oneloop_ud_neft =
-            get_yukawa_one_loop_neft(rslist, beta; neval=4e5, chan=chan, z_renorm=z_renorm)
+            get_yukawa_one_loop_neft(rslist, beta; neval=4e8, chan=chan, z_renorm=z_renorm)
         # Save NEFT and exact results to np files
         if save && rank == root
             @assert isempty(oneloop_sa_neft) == isempty(oneloop_ud_neft) == false
@@ -113,7 +113,7 @@ function main()
                 println_root("nk=$(length(param.qgrid)), na=$(length(param.θgrid))")
                 println_root("nk=$(length(param.qgrid)), na=$(length(param.θgrid))")
                 println_root("euv=$(param.euv), rtol=$(param.rtol)")
-                println_root("\nrs=$(param.rs), beta=$(param.beta), Fs=$(Fs_DMC)")
+                println_root("\nrs=$(param.rs), beta=$(param.beta), Fs=$(Fs)")
             end
             initialize_one_loop_params!(param)  # precomputes the interaction interpoland r(q, iνₘ)
             oneloop_sa, oneloop_ud = get_one_loop_Fs(

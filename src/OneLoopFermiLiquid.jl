@@ -14,6 +14,7 @@ using JLD2
 using Lehmann
 using LinearAlgebra
 using LQSGW
+using Measurements
 using MCIntegration
 using MPI
 using ProgressMeter
@@ -58,7 +59,7 @@ export one_loop_vertex_corrections,
 const alpha_ueg = (4 / 9π)^(1 / 3)
 export alpha_ueg
 
-@with_kw struct OneLoopResult{T}
+struct OneLoopResult{T}
     F1::Tuple{T,T}
     F2v::Tuple{T,T}
     F2b::Tuple{T,T}
@@ -73,9 +74,9 @@ end
 export OneLoopResult
 
 # Overload println for OneLoopResult
-function Base.println(io::IO, oneloop::OneLoopResult)
+function Base.show(io::IO, oneloop::OneLoopResult{T}) where {T}
     println(io, "OneLoopResult:")
-    println(io, "  F1 = ", oneloop.F1, "ξ²")
+    println(io, "  F1 = ", oneloop.F1, "ξ")
     println(io, "  F2v = ", oneloop.F2v, "ξ²")
     println(io, "  F2b = ", oneloop.F2b, "ξ²")
     # println(io, "  F2bubble = ", oneloop.F2bubble, "ξ²")

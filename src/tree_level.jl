@@ -1,7 +1,7 @@
 """
 The one-loop (GW) self-energy Σ₁.
 """
-function Σ1(param::OneLoopParams, kgrid::KGT) where {KGT<:AbstractVector}
+function Σ1(param::UEG.ParaMC, kgrid::KGT) where {KGT<:AbstractVector}
     @unpack kF, EF, Fs, basic = param
     # DLR parameters
     Euv = 1000 * EF
@@ -25,11 +25,14 @@ function Σ1(param::OneLoopParams, kgrid::KGT) where {KGT<:AbstractVector}
     Σ = to_imfreq(to_dlr(Σ_imtime))
     return Σ
 end
+function Σ1(param::OneLoopParams, kgrid::KGT) where {KGT<:AbstractVector}
+    return Σ1(param.paramc, kgrid)
+end
 
 """
 Leading-order (one-loop) correction to Z_F.
 """
-function get_Z1(param::OneLoopParams, kgrid::KGT) where {KGT<:AbstractVector}
+function get_Z1(param::UEG.ParaMC, kgrid::KGT) where {KGT<:AbstractVector}
     if param.isDynamic == false
         # the one-loop self-energy is frequency independent for the Thomas-Fermi interaction
         return 0.0
@@ -37,7 +40,7 @@ function get_Z1(param::OneLoopParams, kgrid::KGT) where {KGT<:AbstractVector}
     sigma1 = Σ1(param, kgrid)
     return zfactor_fermi(param.basic, sigma1)  # compute Z_F using improved finite-temperature scaling
 end
-function get_Z1(param::OneLoopParams)
+function get_Z1(param::UEG.ParaMC)
     if param.isDynamic == false
         # the one-loop self-energy is frequency independent for the Thomas-Fermi interaction
         return 0.0
@@ -47,6 +50,12 @@ function get_Z1(param::OneLoopParams)
         CompositeGrid.LogDensedGrid(:gauss, [0.0, 2.0 * kF], [0.0, kF], 16, 1e-8 * kF, 16)
     sigma1 = Σ1(param, kgrid)
     return zfactor_fermi(param.basic, sigma1)  # compute Z_F using improved finite-temperature scaling
+end
+function get_Z1(param::OneLoopParams, kgrid::KGT) where {KGT<:AbstractVector}
+    return get_Z1(param.paramc, kgrid)
+end
+function get_Z1(param::OneLoopParams)
+    return get_Z1(param.paramc)
 end
 
 """
@@ -65,7 +74,7 @@ end
 """
 Tree-level estimate of F⁺₀ ~ ⟨R(k - k', 0)⟩.
 """
-function get_F1(param::OneLoopParams)
+function get_F1(param::UEG.ParaMC)
     if param.isDynamic == false
         return get_F1_TF(param.rs)
     end
@@ -75,6 +84,9 @@ function get_F1(param::OneLoopParams)
     y = [integrand_F1(x, rstilde, Fs) for x in xgrid]
     F1 = (Fs / 2) + Interp.integrate1D(y, xgrid)
     return F1
+end
+function get_F1(param::OneLoopParams)
+    return get_F1(param.paramc)
 end
 
 """

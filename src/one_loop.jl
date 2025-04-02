@@ -138,8 +138,8 @@ function one_loop_box_diagrams(param::OneLoopParams; show_progress=false)
             θs_integrand[iθ] = Interp.integrate1D(φs_integrand, φgrid)
             θa_integrand[iθ] = Interp.integrate1D(φa_integrand, φgrid)
         end
-        local_data_s[i] = Interp.integrate1D(θ_integrand .* sin.(θgrid.grid), θgrid)
-        local_data_a[i] = Interp.integrate1D(θ_integrand .* sin.(θgrid.grid), θgrid)
+        local_data_s[i] = Interp.integrate1D(θs_integrand .* sin.(θgrid.grid), θgrid)
+        local_data_a[i] = Interp.integrate1D(θa_integrand .* sin.(θgrid.grid), θgrid)
         next!(progress_meter)
     end
     finish!(progress_meter)
@@ -240,10 +240,10 @@ Calculates and returns the total counterterm contribution to F2s and F2a:
 
     2R(z1 - f1 Π0) - f1 Π0 f1 (+ R Π0 R)
 """
-function one_loop_counterterms(param::OneLoopParams; kwargs...)
-    @unpack rs, kF, EF, NF, Fs, basic, isDynamic = param
+function one_loop_counterterms(paramc::UEG.ParaMC)
+    @unpack rs, kF, EF, NF, Fs, basic, isDynamic = paramc
     if isDynamic == false
-        @assert param.mass2 ≈ param.qTF^2 "Counterterms currently only implemented for the Thomas-Fermi interaction (Yukawa mass = qTF)!"
+        @assert paramc.mass2 ≈ paramc.qTF^2 "Counterterms currently only implemented for the Thomas-Fermi interaction (Yukawa mass = qTF)!"
     end
     rstilde = rs * alpha_ueg / π
 
@@ -251,14 +251,14 @@ function one_loop_counterterms(param::OneLoopParams; kwargs...)
     xgrid = CompositeGrid.LogDensedGrid(:gauss, [0.0, 1.0], [0.0, 1.0], 16, 1e-8, 16)
 
     # NF * ⟨R⟩ = -x N_F R(2kF x, 0)
-    F1 = get_F1(param)
+    F1 = get_F1(paramc)
 
     # x R(2kF x, 0)
     x_NF_R = isDynamic ? x_NF_R0 : x_NF_VTF
     x_R0 = [x_NF_R(x, rstilde, Fs) / NF for x in xgrid]
 
     # Z_1(kF)
-    z1 = get_Z1(param, 2 * kF * xgrid)
+    z1 = get_Z1(paramc, 2 * kF * xgrid)
 
     # Π₀(q, iν=0) = -NF * 𝓁(q / 2kF)
     Π0 = -NF * lindhard.(xgrid)
@@ -273,8 +273,11 @@ function one_loop_counterterms(param::OneLoopParams; kwargs...)
     Fs2ct = Fa2ct = -(2 * F1 * A + F1^2 * B)
     return Fs2ct, Fa2ct
 end
+function one_loop_counterterms(param::OneLoopParams)
+    return one_loop_counterterms(param.paramc)
+end
 
-function one_loop_bubble_counterterm(param::OneLoopParams; kwargs...)
+function one_loop_bubble_counterterm(param::OneLoopParams)
     @unpack rs, kF, EF, NF, Fs, basic, isDynamic = param
     if isDynamic == false
         @assert param.mass2 ≈ param.qTF^2 "Counterterms currently only implemented for the Thomas-Fermi interaction (Yukawa mass = qTF)!"
@@ -300,16 +303,21 @@ end
 """
 Calculates and returns all tree-level (F₁) and one-loop (F₂) contributions to Fs2 and Fa2.
 """
-function get_one_loop_Fs(param::OneLoopParams; verbose=false, z_renorm=false, kwargs...)
+function get_one_loop_Fs(
+    param::OneLoopParams;
+    verbose=false,
+    z_renorm=false,
+    show_progress=true,
+)
     Fs1 = Fa1 = get_F1(param)
     F1 = (Fs1, Fa1)
 
-    F2v = real.(one_loop_vertex_corrections(param; kwargs...))
-    F2b = real.(one_loop_box_diagrams(param; kwargs...))
-    # F2bubble = real.(one_loop_bubble_diagram(param; kwargs...))
+    F2v = real.(one_loop_vertex_corrections(param))
+    F2b = real.(one_loop_box_diagrams(param))
+    # F2bubble = real.(one_loop_bubble_diagram(param))
 
-    F2ct = real.(one_loop_counterterms(param; kwargs...))
-    # F2bubblect = real.(one_loop_bubble_counterterm(param; kwargs...))
+    F2ct = real.(one_loop_counterterms(param))
+    # F2bubblect = real.(one_loop_bubble_counterterm(param))
 
     # z²⟨Γ⟩ = (1 + z₁ξ + ...)²⟨Γ⟩ = 2z₁F₁ξ²
     if z_renorm
@@ -335,21 +343,21 @@ function get_one_loop_Fs(param::OneLoopParams; verbose=false, z_renorm=false, kw
     Fa = F1[2] + F2[2]
     F = (Fs, Fa)
 
-    oneloop_sa = OneLoopResult(;
-        F1=F1,
-        F2v=F2v,
-        F2b=F2b,
-        # F2bubble=F2bubble,
-        F2d=F2d,
-        F2ct=F2ct,
-        # F2bubblect=F2bubblect,
-        F2z=F2z,
-        F2=F2,
-        F=F,
+    oneloop_sa = OneLoopResult(
+        F1,
+        F2v,
+        F2b,
+        # F2bubble,
+        F2d,
+        F2ct,
+        # F2bubblect,
+        F2z,
+        F2,
+        F,
     )
     oneloop_ud = sa2ud(oneloop_sa)
-    verbose && println_root("(s, a):\n", oneloop_sa)
-    verbose && println_root("(↑↑, ↑↓):\n", oneloop_ud)
+    verbose && println_root("(s, a):\n$oneloop_sa")
+    verbose && println_root("(↑↑, ↑↓):\n$oneloop_ud")
     return oneloop_sa, oneloop_ud
 end
 
@@ -410,6 +418,7 @@ function get_yukawa_one_loop_neft(
     seed=1234,
     chan=:PH,
     z_renorm=false,
+    noTransferMomentum=true,
 )
     # We calculate the counterterms and tree-level diagram exactly
     partitions = [(1, 0, 0)]
@@ -436,7 +445,6 @@ function get_yukawa_one_loop_neft(
     # TODO: Determine which of these is correct (matters for dynamic interactions!)
     #       with -1, we have a transfer frequency of iν₁ = i2πT, and with all zeros,
     #       we have iν₀ = 0.
-    noTransferMomentum = true
     if noTransferMomentum
         transferFrequencyIndices = [0, 0, 0]
     else
@@ -480,38 +488,42 @@ function get_yukawa_one_loop_neft(
         )
         if isnothing(data) == false
             # one-loop diagrams from NEFT toolbox
-            F2d = real(data[partitions[1]])
+            F2d = Tuple(real(data[partitions[1]]))
             # tree-level F1↑↑ and F1↑↓ calculated exactly
             Fs1 = Fa1 = get_F1_TF(rs)
-            F1 = Ver4.sa2ud(Fs1, Fa1)  # = (2 * get_F1_TF(rs), 0.0)
+            F1 = measurement.((Ver4.sa2ud(Fs1, Fa1)))  # = (2 * get_F1_TF(rs), 0.0)
             # one-loop R-type counterterms calculated exactly
-            Fs2ct, Fa2ct = real.(one_loop_counterterms(param; kwargs...))
-            F2ct = Ver4.sa2ud(Fs2ct, Fa2ct)
+            Fs2ct, Fa2ct = real.(one_loop_counterterms(paramc))
+            F2ct = measurement.((Ver4.sa2ud(Fs2ct, Fa2ct)))
             # z²⟨Γ⟩ = (1 + z₁ξ + ...)²⟨Γ⟩ = 2z₁F₁ξ²
             if z_renorm
                 z1 = get_Z1(param)
                 Fs2z = Fa2z = 2 * z1 * F1
-                F2z = (Fs2z, Fa2z)
+                F2z = measurement.((Fs2z, Fa2z))
             else
-                F2z = (0.0, 0.0)
+                F2z = measurement.((0.0, 0.0))
             end
+            println(F2d)
+            println(F2ct)
+            println(F2z)
             Fuu2 = F2d[1] + F2ct[1] + F2z[1]
-            F2ud = F2d[2] + F2ct[2] + F2z[2]
-            F2 = (Fuu2, F2ud)
+            Fud2 = F2d[2] + F2ct[2] + F2z[2]
+            F2 = (Fuu2, Fud2)
             Fuu = F1[1] + F2[1]
             Fud = F1[2] + F2[2]
             F = (Fuu, Fud)
-            oneloop_ud = OneLoopResult(;
-                F1=F1,
-                F2v=(NaN, NaN),
-                F2b=(NaN, NaN),
-                # F2bubble=(NaN, NaN),
-                F2d=F2d,
-                F2ct=F2ct,
-                # F2bubblect=(NaN, NaN),
-                F2z=F2z,
-                F2=F2,
-                F=F,
+            no_meas = measurement.((NaN, NaN))
+            oneloop_ud = OneLoopResult(
+                F1,
+                no_meas,
+                no_meas,
+                # no_meas,
+                F2d,
+                F2ct,
+                # no_meas,
+                F2z,
+                F2,
+                F,
             )
             oneloop_sa = ud2sa(oneloop_ud)
             push!(oneloop_neft_sa, oneloop_sa)
