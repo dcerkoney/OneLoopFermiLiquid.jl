@@ -169,7 +169,7 @@ function one_loop_direct_box_diagrams(
     which="both",
 )
     @assert param.initialized "r(q, iνₘ) data not yet initialized!"
-    @assert which in ["both", "ladder", "crossed"]
+    @assert which in ["both", "uncrossed", "crossed"]
     MPI.Init()
     root = 0
     comm = MPI.COMM_WORLD

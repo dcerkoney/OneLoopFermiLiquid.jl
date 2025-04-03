@@ -584,7 +584,7 @@ function box_matsubara_sum(param::OneLoopParams, q, θ, φ; ftype="fs")
 end
 
 function direct_box_matsubara_summand(param::OneLoopParams, q, θ, φ; which="both")
-    @assert which in ["both", "ladder", "crossed"]
+    @assert which in ["both", "uncrossed", "crossed"]
     @unpack β, NF, kamp1, kamp2, θ12, mgrid, vmgrid, Mmax, iw0 = param
     # p1 = |k + q'|, p2 = |k' + q'|, p3 = |k' - q'|, qex = |k - k' + q'|
     k1vec = [0, 0, kamp1]
@@ -610,7 +610,7 @@ function direct_box_matsubara_summand(param::OneLoopParams, q, θ, φ; which="bo
                 r_interp(param, q, m) * (G0(param, p2, ivm_Fp) + G0(param, p3, ivm_Fm))
         elseif which == "crossed"
             s_ivm_inner = r_interp(param, q, m) * G0(param, p2, ivm_Fp)
-        elseif which == "ladder"
+        elseif which == "uncrossed"
             s_ivm_inner = r_interp(param, q, m) * G0(param, p3, ivm_Fm)
         end
         s_ivm[i] = q^2 * r_interp(param, q, m) * G0(param, p1, ivm_Fp) * s_ivm_inner / β
@@ -622,7 +622,7 @@ end
 
 function direct_box_matsubara_sum(param::OneLoopParams, q, θ, φ; which="both")
     # sum over iνₘ including negative frequency terms (S(iνₘ) = S(-iνₘ))
-    @assert which in ["both", "ladder", "crossed"]
+    @assert which in ["both", "uncrossed", "crossed"]
     summand = direct_box_matsubara_summand(param, q, θ, φ; which=which)
     matsubara_sum = summand[1] + 2 * sum(summand[2:end])
     return matsubara_sum
@@ -860,7 +860,7 @@ end
 
 function plot_direct_box_matsubara_summand(param::OneLoopParams; which="both")
     @assert param.initialized "R(q, iνₘ) data not yet initialized!"
-    @assert which in ["both", "ladder", "crossed"]
+    @assert which in ["both", "uncrossed", "crossed"]
     @unpack β, kF, EF, Mmax, Q_CUTOFF, isDynamic = param
     plot_qs = [Q_CUTOFF, kF, 2 * kF]
     plot_qstrs = ["Q_CUTOFF", "kF", "2kF"]
@@ -917,7 +917,7 @@ end
 
 function plot_direct_box_matsubara_sum(param::OneLoopParams; which="both")
     @assert param.initialized "R(q, iνₘ) data not yet initialized!"
-    @assert which in ["both", "ladder", "crossed"]
+    @assert which in ["both", "uncrossed", "crossed"]
     @unpack β, kF, EF, Mmax, Q_CUTOFF, θgrid, isDynamic = param
     clabels = ["Re", "Im"]
     cparts = [real, imag]
@@ -1124,7 +1124,7 @@ function one_loop_direct_box_diagrams(
     which="both",
 )
     @assert param.initialized "r(q, iνₘ) data not yet initialized!"
-    @assert which in ["both", "ladder", "crossed"]
+    @assert which in ["both", "uncrossed", "crossed"]
     MPI.Init()
     root = 0
     comm = MPI.COMM_WORLD
@@ -1697,7 +1697,7 @@ function main()
     # initialize_one_loop_params!(param_kop)
 
     # # Test direct box integrand
-    # for which in ["both", "ladder", "crossed"]
+    # for which in ["both", "uncrossed", "crossed"]
     #     println_root("\n$which direct box diagrams:")
     #     println_root("RPA:")
     #     println_root(
@@ -1734,7 +1734,7 @@ function main()
     #     end
     #     # Direct box integrand plots
     #     if direct_box_plots
-    #         for which in ["both", "ladder", "crossed"]
+    #         for which in ["both", "uncrossed", "crossed"]
     #             plot_direct_box_matsubara_summand(param_rpa; which=which)
     #             plot_direct_box_matsubara_sum(param_rpa; which=which)
     #             # plot_direct_box_matsubara_summand(param_kop; which=which)

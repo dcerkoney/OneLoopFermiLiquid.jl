@@ -303,7 +303,7 @@ end
 
 function plot_direct_box_matsubara_summand(param::OneLoopParams; which="both")
     @assert param.initialized "R(q, iνₘ) data not yet initialized!"
-    @assert which in ["both", "ladder", "crossed"]
+    @assert which in ["both", "uncrossed", "crossed"]
     @unpack β, kF, EF, Mmax, Q_CUTOFF, isDynamic = param
     plot_qs = [Q_CUTOFF, kF, 2 * kF]
     plot_qstrs = ["Q_CUTOFF", "kF", "2kF"]
@@ -360,7 +360,7 @@ end
 
 function plot_direct_box_matsubara_sum(param::OneLoopParams; which="both")
     @assert param.initialized "R(q, iνₘ) data not yet initialized!"
-    @assert which in ["both", "ladder", "crossed"]
+    @assert which in ["both", "uncrossed", "crossed"]
     @unpack β, kF, EF, Mmax, Q_CUTOFF, θgrid, isDynamic = param
     clabels = ["Re", "Im"]
     cparts = [real, imag]
