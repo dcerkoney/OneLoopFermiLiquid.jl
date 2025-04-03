@@ -1008,7 +1008,7 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
         color=cdict["cyan"],
         label="\$F^{\\uparrow\\downarrow}_2 \\xi^2\$",
     )
-    # ax.set_xlabel("\$r_s\$")
+    ax.set_xlabel("\$r_s\$")
     # ax.set_ylabel("\$F^{\\sigma_1 \\sigma_2}\$")
     # if isDynamic == false
     #     ax.set_ylim(-0.9, 0.9)
@@ -1073,7 +1073,7 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     ax.set_xlabel("\$r_s\$")
     # ax.set_ylabel("\$F^{\\sigma_1 \\sigma_2}\$")
     if isDynamic == false
-        ax.set_ylim(-0.6, 0.05)
+        ax.set_ylim(-0.62, 0.06)
     end
     ax.set_xlim(0, 10)
     # ax.set_ylabel("\$F^s\$")
@@ -1145,7 +1145,7 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     plt.close(fig)
 
     ########################
-    ### Fig 6: F2s vs rs ###
+    ### Fig 6: F2a vs rs ###
     ########################
 
     # NOTE: CTs are identically zero for F2↑↓ for both ours/NEFT! ⟹ F2s and F2a CTs are identical
@@ -1188,10 +1188,10 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
         color=cdict["cyan"],
         label="\$F^{s}_2 \\xi^2\$",
     )
-    # ax.set_xlabel("\$r_s\$")
+    ax.set_xlabel("\$r_s\$")
     # ax.set_ylabel("\$F^{\\sigma_1 \\sigma_2}\$")
     if isDynamic == false
-        ax.set_ylim(-0.2, 0.25)
+        ax.set_ylim(-0.22, 0.22)
     end
     # ax.set_ylabel("\$F^s\$")
     ax.set_xlim(0, 10)
