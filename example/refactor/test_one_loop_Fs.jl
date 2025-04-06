@@ -943,7 +943,7 @@ function plot_counterterms(param::OneLoopParams)
 end
 
 # 2RΛ₁
-function one_loop_vertex_corrections(param::OneLoopParams; show_progress=true)
+function one_loop_vertex_contribution(param::OneLoopParams; show_progress=true)
     @assert param.initialized "R(q, iνₘ) data not yet initialized!"
     MPI.Init()
     root = 0
@@ -1013,7 +1013,7 @@ function one_loop_vertex_corrections(param::OneLoopParams; show_progress=true)
 end
 
 # gg'RR' + exchange counterpart
-function one_loop_box_diagrams(param::OneLoopParams; show_progress=true)
+function one_loop_box_contribution(param::OneLoopParams; show_progress=true)
     @assert param.initialized "R(q, iνₘ) data not yet initialized!"
     MPI.Init()
     root = 0
@@ -1082,7 +1082,7 @@ end
 
 function test_vertex_integral(param::OneLoopParams; show_progress=true, verbose=true)
     verbose && println_root("Computing vertex part of F2...")
-    timed_res = @timed one_loop_vertex_corrections(param; show_progress=show_progress)
+    timed_res = @timed one_loop_vertex_contribution(param; show_progress=show_progress)
     result = timed_res.value
     verbose && println_root("done")
     verbose && println_root(timed_result_to_string(timed_res))
@@ -1091,7 +1091,7 @@ end
 
 function test_box_integral(param::OneLoopParams; show_progress=true, verbose=true)
     verbose && println_root("Computing box part of F2...")
-    timed_res = @timed one_loop_box_diagrams(param; show_progress=show_progress)
+    timed_res = @timed one_loop_box_contribution(param; show_progress=show_progress)
     result = timed_res.value
     verbose && println_root("done")
     verbose && println_root(timed_result_to_string(timed_res))
@@ -1114,8 +1114,8 @@ end
 
 function get_one_loop_Fs(param::OneLoopParams; kwargs...)
     function one_loop_total(param; kwargs...)
-        return one_loop_vertex_corrections(param; kwargs...) +
-               one_loop_box_diagrams(param; kwargs...) +
+        return one_loop_vertex_contribution(param; kwargs...) +
+               one_loop_box_contribution(param; kwargs...) +
                one_loop_counterterms(param; kwargs...)
     end
     F2 = one_loop_total(param; kwargs...)

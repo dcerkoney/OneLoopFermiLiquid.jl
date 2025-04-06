@@ -498,7 +498,7 @@ function plot_extras(rslist, ftype)
     # ax.set_ylabel("\$F^s\$")
     ax.legend(; ncol=2, fontsize=12, loc="best", columnspacing=0.5)
     plt.tight_layout()
-    fig.savefig("oneshot_one_loop_$(ftype)_yukawa_vs_rs$(interactionstr)_benchmark.pdf")
+    fig.savefig("oneloop_$(ftype)_yukawa_vs_rs$(interactionstr)_benchmark.pdf")
     plt.close(fig)
 
     FsDMCs, FaDMCs, F1NEFTs, Fs2NEFTs, Fa2NEFTs =
@@ -610,7 +610,7 @@ function plot_extras(rslist, ftype)
     # ax.set_ylabel("\$F^s\$")
     ax.legend(; ncol=2, fontsize=12, loc="best", columnspacing=0.5)
     plt.tight_layout()
-    fig.savefig("oneshot_one_loop_$(ftype)_yukawa_vs_rs$(interactionstr).pdf")
+    fig.savefig("oneloop_$(ftype)_yukawa_vs_rs$(interactionstr).pdf")
     # fig.savefig("kappa0_over_kappa_yukawa_vs_rs.pdf")
     plt.close(fig)
 
@@ -685,7 +685,7 @@ function plot_extras(rslist, ftype)
     )
     fig.tight_layout()
     fig.savefig(
-        "oneshot_one_loop_$(ftype)_vs_rs_euv=$(euv)_rtol=$(rtol)$(zstr)$(interactionstr).pdf",
+        "oneloop_$(ftype)_vs_rs_euv=$(euv)_rtol=$(rtol)$(zstr)$(interactionstr).pdf",
     )
     plt.close(fig)
 
@@ -730,8 +730,8 @@ function plot_extras(rslist, ftype)
     )
     fig.tight_layout()
     fig.savefig(
-        # "oneshot_one_loop_$(ftype)_vs_rs_euv=$(euv)_rtol=$(rtol)$(zstr)$(interactionstr)_zoom.pdf",
-        "oneshot_one_loop_$(fp1type)_vs_rs_euv=$(euv)_rtol=$(rtol)$(zstr)$(interactionstr)_zoom.pdf",
+        # "oneloop_$(ftype)_vs_rs_euv=$(euv)_rtol=$(rtol)$(zstr)$(interactionstr)_zoom.pdf",
+        "oneloop_$(fp1type)_vs_rs_euv=$(euv)_rtol=$(rtol)$(zstr)$(interactionstr)_zoom.pdf",
     )
     plt.close(fig)
 end
@@ -760,79 +760,255 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
 
     # Load NEFT benchmark data using jld2
     @load "one_loop_F_neft_$(chan).jld2" rslist oneloop_sa_neft oneloop_ud_neft
-    function getprop_sa_neft(p::Symbol, factor=1.0)
-        res = [factor .* x for x in getproperty.(oneloop_sa_neft, p)]
+    rslist_big = rslist
+    function loaddata_oneloop_neft(property::Symbol, representation="sa", factor=1.0)
+        @assert representation in ["sa", "ud"]
+        data = representation == "sa" ? oneloop_sa_neft : oneloop_ud_neft
+        res = [factor .* x for x in getproperty.(data, property)]
         res_s, res_a = first.(res), last.(res)
         return res_s, res_a
     end
-    function getprop_ud_neft(p::Symbol, factor=1.0)
-        res = [factor .* x for x in getproperty.(oneloop_ud_neft, p)]
-        res_uu, res_ud = first.(res), last.(res)
-        return res_uu, res_ud
-    end
-    rslist_big = rslist
 
-    # Fs = (F↑↑ + F↑↓) / 2, Fa = (F↑↑ - F↑↓) / 2,
-    Fs1s_neft, Fa1s_neft = getprop_sa_neft(:F1, neft_factor_tree_level)
-    Fs2vs_neft, Fa2vs_neft = getprop_sa_neft(:F2v, neft_factor_one_loop)
-    Fs2bs_neft, Fa2bs_neft = getprop_sa_neft(:F2b, neft_factor_one_loop)
-    # Fs2bubbles_neft, Fa2bubbles_neft = getprop_sa_neft(:F2bubble, neft_factor_one_loop)
-    Fs2ds_neft, Fa2ds_neft = getprop_sa_neft(:F2d, neft_factor_one_loop)
-    Fs2cts_neft, Fa2cts_neft = getprop_sa_neft(:F2ct, neft_factor_one_loop)
-    # Fs2bubblects_neft, Fa2bubblects_neft = getprop_sa_neft(:F2bubblect, neft_factor_one_loop)
-    Fs2zs_neft, Fa2zs_neft = getprop_sa_neft(:F2z, neft_factor_one_loop)
-    Fs2s_neft, Fa2s_neft = getprop_sa_neft(:F2, neft_factor_one_loop)
-    Fss_neft, Fas_neft = getprop_sa_neft(:F, neft_factor_one_loop)
+    # Fs = (F↑↑ + F↑↓) / 2, Fa = (F↑↑ - F↑↓) / 2
+    Fs1s_neft, Fa1s_neft = loaddata_oneloop_neft(:F1, "sa", neft_factor_tree_level)
+    Fs2vs_neft, Fa2vs_neft = loaddata_oneloop_neft(:F2v, "sa", neft_factor_one_loop)
+    Fs2bs_neft, Fa2bs_neft = loaddata_oneloop_neft(:F2b, "sa", neft_factor_one_loop)
+    # Fs2bubbles_neft, Fa2bubbles_neft = loaddata_oneloop_neft(:F2bubble, "sa", neft_factor_one_loop)
+    Fs2ds_neft, Fa2ds_neft = loaddata_oneloop_neft(:F2d, "sa", neft_factor_one_loop)
+    Fs2cts_neft, Fa2cts_neft = loaddata_oneloop_neft(:F2ct, "sa", neft_factor_one_loop)
+    # Fs2bubblects_neft, Fa2bubblects_neft = loaddata_oneloop_neft(:F2bubblect, "sa", neft_factor_one_loop)
+    Fs2zs_neft, Fa2zs_neft = loaddata_oneloop_neft(:F2z, "sa", neft_factor_one_loop)
+    Fs2s_neft, Fa2s_neft = loaddata_oneloop_neft(:F2, "sa", neft_factor_one_loop)
+    Fss_neft, Fas_neft = loaddata_oneloop_neft(:F, "sa", neft_factor_one_loop)
 
     # F↑↑ = Fs + Fa, F↑↓ = Fs - Fa
-    Fuu1s_neft, Fud1s_neft = getprop_ud_neft(:F1, neft_factor_tree_level)
-    Fuu2vs_neft, Fud2vs_neft = getprop_ud_neft(:F2v, neft_factor_one_loop)
-    Fuu2bs_neft, Fud2bs_neft = getprop_ud_neft(:F2b, neft_factor_one_loop)
-    # Fuu2bubbles_neft, Fud2bubbles_neft = getprop_ud_neft(:F2bubble, neft_factor_one_loop)
-    Fuu2ds_neft, Fud2ds_neft = getprop_ud_neft(:F2d, neft_factor_one_loop)
-    Fuu2cts_neft, Fud2cts_neft = getprop_ud_neft(:F2ct, neft_factor_one_loop)
-    # Fuu2bubblects_neft, Fud2bubblects_neft = getprop_ud_neft(:F2bubblect, neft_factor_one_loop)
-    Fuu2zs_neft, Fud2zs_neft = getprop_ud_neft(:F2z, neft_factor_one_loop)
-    Fuu2s_neft, Fud2s_neft = getprop_ud_neft(:F2, neft_factor_one_loop)
-    Fuus_neft, Fuds_neft = getprop_ud_neft(:F, neft_factor_one_loop)
+    Fuu1s_neft, Fud1s_neft = loaddata_oneloop_neft(:F1, "ud", neft_factor_tree_level)
+    Fuu2vs_neft, Fud2vs_neft = loaddata_oneloop_neft(:F2v, "ud", neft_factor_one_loop)
+    Fuu2bs_neft, Fud2bs_neft = loaddata_oneloop_neft(:F2b, "ud", neft_factor_one_loop)
+    # Fuu2bubbles_neft, Fud2bubbles_neft = loaddata_oneloop_neft(:F2bubble, "ud", neft_factor_one_loop)
+    Fuu2ds_neft, Fud2ds_neft = loaddata_oneloop_neft(:F2d, "ud", neft_factor_one_loop)
+    Fuu2cts_neft, Fud2cts_neft = loaddata_oneloop_neft(:F2ct, "ud", neft_factor_one_loop)
+    # Fuu2bubblects_neft, Fud2bubblects_neft = loaddata_oneloop_neft(:F2bubblect, "ud", neft_factor_one_loop)
+    Fuu2zs_neft, Fud2zs_neft = loaddata_oneloop_neft(:F2z, "ud", neft_factor_one_loop)
+    Fuu2s_neft, Fud2s_neft = loaddata_oneloop_neft(:F2, "ud", neft_factor_one_loop)
+    Fuus_neft, Fuds_neft = loaddata_oneloop_neft(:F, "ud", neft_factor_one_loop)
 
     # Load our data using jld2
     @load "one_loop_F_ours.jld2" rslist oneloop_sa_ours oneloop_ud_ours
-    function getprop_sa_ours(p::Symbol)
-        res = getproperty.(oneloop_sa_ours, p)
+    rslist_small = rslist
+    function loaddata_oneloop_ours(property::Symbol, representation="sa", factor=1.0)
+        @assert representation in ["sa", "ud"]
+        data = representation == "sa" ? oneloop_sa_ours : oneloop_ud_ours
+        res = [factor .* x for x in getproperty.(data, property)]
         res_s, res_a = first.(res), last.(res)
         return res_s, res_a
     end
-    function getprop_ud_ours(p::Symbol)
-        res = getproperty.(oneloop_ud_ours, p)
-        res_uu, res_ud = first.(res), last.(res)
-        return res_uu, res_ud
-    end
-    rslist_small = rslist
 
-    # Fs = (F↑↑ + F↑↓) / 2, Fa = (F↑↑ - F↑↓) / 2,
-    Fs1s_ours, Fa1s_ours = getprop_sa_ours(:F1)
-    Fs2vs_ours, Fa2vs_ours = getprop_sa_ours(:F2v)
-    Fs2bs_ours, Fa2bs_ours = getprop_sa_ours(:F2b)
-    # Fs2bubbles_ours, Fa2bubbles_ours = getprop_sa_ours(:F2bubble)
-    Fs2ds_ours, Fa2ds_ours = getprop_sa_ours(:F2d)
-    Fs2cts_ours, Fa2cts_ours = getprop_sa_ours(:F2ct)
-    # Fs2bubblects_ours, Fa2bubblects_ours = getprop_sa_ours(:F2bubblect)
-    Fs2zs_ours, Fa2zs_ours = getprop_sa_ours(:F2z)
-    Fs2s_ours, Fa2s_ours = getprop_sa_ours(:F2)
-    Fss_ours, Fas_ours = getprop_sa_ours(:F)
+    # Fs = (F↑↑ + F↑↓) / 2, Fa = (F↑↑ - F↑↓) / 2
+    Fs1s_ours, Fa1s_ours = loaddata_oneloop_ours(:F1, "sa")
+    Fs2vs_ours, Fa2vs_ours = loaddata_oneloop_ours(:F2v, "sa")
+    Fs2bs_ours, Fa2bs_ours = loaddata_oneloop_ours(:F2b, "sa")
+    # Fs2bubbles_ours, Fa2bubbles_ours = loaddata_oneloop_ours(:F2bubble, "sa")
+    Fs2ds_ours, Fa2ds_ours = loaddata_oneloop_ours(:F2d, "sa")
+    Fs2cts_ours, Fa2cts_ours = loaddata_oneloop_ours(:F2ct, "sa")
+    # Fs2bubblects_ours, Fa2bubblects_ours = loaddata_oneloop_ours(:F2bubblect, "sa")
+    Fs2zs_ours, Fa2zs_ours = loaddata_oneloop_ours(:F2z, "sa")
+    Fs2s_ours, Fa2s_ours = loaddata_oneloop_ours(:F2, "sa")
+    Fss_ours, Fas_ours = loaddata_oneloop_ours(:F, "sa")
 
     # F↑↑ = Fs + Fa, F↑↓ = Fs - Fa
-    Fuu1s_ours, Fud1s_ours = getprop_ud_ours(:F1)
-    Fuu2vs_ours, Fud2vs_ours = getprop_ud_ours(:F2v)
-    Fuu2bs_ours, Fud2bs_ours = getprop_ud_ours(:F2b)
-    # Fuu2bubbles_ours, Fud2bubbles_ours = getprop_ud_ours(:F2bubble)
-    Fuu2ds_ours, Fud2ds_ours = getprop_ud_ours(:F2d)
-    Fuu2cts_ours, Fud2cts_ours = getprop_ud_ours(:F2ct)
-    # Fuu2bubblects_ours, Fud2bubblects_ours = getprop_ud_ours(:F2bubblect)
-    Fuu2zs_ours, Fud2zs_ours = getprop_ud_ours(:F2z)
-    Fuu2s_ours, Fud2s_ours = getprop_ud_ours(:F2)
-    Fuus_ours, Fuds_ours = getprop_ud_ours(:F)
+    Fuu1s_ours, Fud1s_ours = loaddata_oneloop_ours(:F1, "ud")
+    Fuu2vs_ours, Fud2vs_ours = loaddata_oneloop_ours(:F2v, "ud")
+    Fuu2bs_ours, Fud2bs_ours = loaddata_oneloop_ours(:F2b, "ud")
+    # Fuu2bubbles_ours, Fud2bubbles_ours = loaddata_oneloop_ours(:F2bubble, "ud")
+    Fuu2ds_ours, Fud2ds_ours = loaddata_oneloop_ours(:F2d, "ud")
+    Fuu2cts_ours, Fud2cts_ours = loaddata_oneloop_ours(:F2ct, "ud")
+    # Fuu2bubblects_ours, Fud2bubblects_ours = loaddata_oneloop_ours(:F2bubblect, "ud")
+    Fuu2zs_ours, Fud2zs_ours = loaddata_oneloop_ours(:F2z, "ud")
+    Fuu2s_ours, Fud2s_ours = loaddata_oneloop_ours(:F2, "ud")
+    Fuus_ours, Fuds_ours = loaddata_oneloop_ours(:F, "ud")
+
+    # Load our data for the four individual box diagram contributions
+    @load "one_loop_box_diagrams_ours.jld2" rslist boxdiags_sa_ours boxdiags_ud_ours
+    function loaddata_boxdiags_ours(property::Symbol, representation="sa", factor=1.0)
+        @assert representation in ["sa", "ud"]
+        data = representation == "sa" ? boxdiags_sa_ours : boxdiags_ud_ours
+        res = [factor .* x for x in getproperty.(data, property)]
+        res_s, res_a = first.(res), last.(res)
+        return res_s, res_a
+    end
+
+    # Fs = (F↑↑ + F↑↓) / 2, Fa = (F↑↑ - F↑↓) / 2
+    Fs2bs_DC_ours, Fa2bs_DC_ours = loaddata_boxdiags_ours(:F2b_direct_crossed, "sa")
+    Fs2bs_DU_ours, Fa2bs_DU_ours = loaddata_boxdiags_ours(:F2b_direct_uncrossed, "sa")
+    Fs2bs_EC_ours, Fa2bs_EC_ours = loaddata_boxdiags_ours(:F2b_exchange_crossed, "sa")
+    Fs2bs_EU_ours, Fa2bs_EU_ours = loaddata_boxdiags_ours(:F2b_exchange_uncrossed, "sa")
+
+    # F↑↑ = Fs + Fa, F↑↓ = Fs - Fa
+    Fuu2bs_DC_ours, Fud2bs_DC_ours = loaddata_boxdiags_ours(:F2b_direct_crossed, "ud")
+    Fuu2bs_DU_ours, Fud2bs_DU_ours = loaddata_boxdiags_ours(:F2b_direct_uncrossed, "ud")
+    Fuu2bs_EC_ours, Fud2bs_EC_ours = loaddata_boxdiags_ours(:F2b_exchange_crossed, "ud")
+    Fuu2bs_EU_ours, Fud2bs_EU_ours = loaddata_boxdiags_ours(:F2b_exchange_uncrossed, "ud")
+
+    #############################################
+    ### Fig 7: Individual F2↑↑ diagrams vs rs ###
+    #############################################
+
+    fig, ax = plt.subplots(; figsize=(5, 5))
+    # Our data
+    ax.plot(
+        spline(rslist_small, Fuu2bs_DC_ours)...;
+        color=cdict["orange"],
+        label="\$F^{\\uparrow\\uparrow,\\text{b}}_{2,\\text{DC}} \\xi^2\$",
+    )
+    ax.plot(
+        spline(rslist_small, Fuu2bs_DU_ours)...;
+        color=cdict["blue"],
+        label="\$F^{\\uparrow\\uparrow,\\text{b}}_{2,\\text{DU}} \\xi^2\$",
+    )
+    ax.plot(
+        spline(rslist_small, Fuu2bs_EC_ours)...;
+        color=cdict["cyan"],
+        label="\$F^{\\uparrow\\uparrow,\\text{b}}_{2,\\text{EC}} \\xi^2\$",
+    )
+    ax.plot(
+        spline(rslist_small, Fuu2bs_EU_ours)...;
+        color=cdict["magenta"],
+        label="\$F^{\\uparrow\\uparrow,\\text{b}}_{2,\\text{EU}} \\xi^2\$",
+    )
+    ax.plot(
+        spline(rslist_small, Fuu2vs_ours)...;
+        color=cdict["red"],
+        label="\$F^{\\uparrow\\uparrow,\\text{v}}_2 \\xi^2\$",
+    )
+    ax.set_xlabel("\$r_s\$")
+    if isDynamic == false
+        # ax.set_ylim(-0.9, 0.9)
+    end
+    ax.set_xlim(0, 10)
+    ax.legend(; ncol=2, fontsize=12, loc="upper left", columnspacing=0.5)
+    plt.tight_layout()
+    fig.savefig("oneloop_F2_uu_diagrams_vs_rs$(interactionstr)_$(chan).pdf")
+
+    #############################################
+    ### Fig 8: Individual F2↑↓ diagrams vs rs ###
+    #############################################
+
+    fig, ax = plt.subplots(; figsize=(5, 5))
+    # Our data
+    ax.plot(
+        spline(rslist_small, Fud2bs_DC_ours)...;
+        color=cdict["orange"],
+        label="\$F^{\\uparrow\\downarrow,\\text{b}}_{2,\\text{DC}} \\xi^2\$",
+    )
+    ax.plot(
+        spline(rslist_small, Fud2bs_DU_ours)...;
+        color=cdict["blue"],
+        label="\$F^{\\uparrow\\downarrow,\\text{b}}_{2,\\text{DU}} \\xi^2\$",
+    )
+    ax.plot(
+        spline(rslist_small, Fud2bs_EC_ours)...;
+        color=cdict["cyan"],
+        label="\$F^{\\uparrow\\downarrow,\\text{b}}_{2,\\text{EC}} \\xi^2\$",
+    )
+    ax.plot(
+        spline(rslist_small, Fud2bs_EU_ours)...;
+        color=cdict["magenta"],
+        label="\$F^{\\uparrow\\downarrow,\\text{b}}_{2,\\text{EU}} \\xi^2\$",
+    )
+    ax.plot(
+        spline(rslist_small, Fud2vs_ours)...;
+        color=cdict["red"],
+        label="\$F^{\\uparrow\\downarrow,\\text{v}}_2 \\xi^2\$",
+    )
+    ax.set_xlabel("\$r_s\$")
+    if isDynamic == false
+        ax.set_ylim(-0.26, 0.22)
+    end
+    ax.set_xlim(0, 10)
+    ax.legend(; ncol=2, fontsize=12, loc="upper left", columnspacing=0.5)
+    plt.tight_layout()
+    fig.savefig("oneloop_F2_ud_diagrams_vs_rs$(interactionstr)_$(chan).pdf")
+
+    ############################################
+    ### Fig 9: Individual F2s diagrams vs rs ###
+    ############################################
+
+    fig, ax = plt.subplots(; figsize=(5, 5))
+    # Our data
+    ax.plot(
+        spline(rslist_small, Fs2bs_DC_ours)...;
+        color=cdict["orange"],
+        label="\$F^{s,\\text{b}}_{2,\\text{DC}} \\xi^2\$",
+    )
+    ax.plot(
+        spline(rslist_small, Fs2bs_DU_ours)...;
+        color=cdict["blue"],
+        label="\$F^{s,\\text{b}}_{2,\\text{DU}} \\xi^2\$",
+    )
+    ax.plot(
+        spline(rslist_small, Fs2bs_EC_ours)...;
+        color=cdict["cyan"],
+        label="\$F^{s,\\text{b}}_{2,\\text{EC}} \\xi^2\$",
+    )
+    ax.plot(
+        spline(rslist_small, Fs2bs_EU_ours)...;
+        color=cdict["magenta"],
+        label="\$F^{s,\\text{b}}_{2,\\text{EU}} \\xi^2\$",
+    )
+    ax.plot(
+        spline(rslist_small, Fs2vs_ours)...;
+        color=cdict["red"],
+        label="\$F^{s,\\text{v}}_2 \\xi^2\$",
+    )
+    ax.set_xlabel("\$r_s\$")
+    if isDynamic == false
+        # ax.set_ylim(-0.9, 0.9)
+    end
+    ax.set_xlim(0, 10)
+    ax.legend(; ncol=2, fontsize=12, loc="upper left", columnspacing=0.5)
+    plt.tight_layout()
+    fig.savefig("oneloop_F2_s_diagrams_vs_rs$(interactionstr)_$(chan).pdf")
+
+    #############################################
+    ### Fig 10: Individual F2a diagrams vs rs ###
+    #############################################
+
+    fig, ax = plt.subplots(; figsize=(5, 5))
+    # Our data
+    ax.plot(
+        spline(rslist_small, Fa2bs_DC_ours)...;
+        color=cdict["orange"],
+        label="\$F^{a,\\text{b}}_{2,\\text{DC}} \\xi^2\$",
+    )
+    ax.plot(
+        spline(rslist_small, Fa2bs_DU_ours)...;
+        color=cdict["blue"],
+        label="\$F^{a,\\text{b}}_{2,\\text{DU}} \\xi^2\$",
+    )
+    ax.plot(
+        spline(rslist_small, Fa2bs_EC_ours)...;
+        color=cdict["cyan"],
+        label="\$F^{a,\\text{b}}_{2,\\text{EC}} \\xi^2\$",
+    )
+    ax.plot(
+        spline(rslist_small, Fa2bs_EU_ours)...;
+        color=cdict["magenta"],
+        label="\$F^{a,\\text{b}}_{2,\\text{EU}} \\xi^2\$",
+    )
+    ax.plot(
+        spline(rslist_small, Fa2vs_ours)...;
+        color=cdict["red"],
+        label="\$F^{a,\\text{v}}_2 \\xi^2\$",
+    )
+    ax.set_xlabel("\$r_s\$")
+    if isDynamic == false
+        # ax.set_ylim(-0.9, 0.9)
+    end
+    ax.set_xlim(0, 10)
+    ax.legend(; ncol=2, fontsize=12, loc="upper left", columnspacing=0.5)
+    plt.tight_layout()
+    fig.savefig("oneloop_F2_a_diagrams_vs_rs$(interactionstr)_$(chan).pdf")
 
     ############################
     ### Fig 1: F↑↑/F↑↓ vs rs ###
@@ -893,7 +1069,7 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     # ax.set_ylabel("\$F^s\$")
     ax.legend(; ncol=2, fontsize=12, loc="upper left", columnspacing=0.5)
     plt.tight_layout()
-    fig.savefig("oneshot_one_loop_F_uu_and_ud$(interactionstr)_vs_rs_$(chan).pdf")
+    fig.savefig("oneloop_F_uu_and_ud$(interactionstr)_vs_rs_$(chan).pdf")
     plt.close(fig)
 
     #########################
@@ -954,7 +1130,7 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     ax.set_xlim(0, 10)
     ax.legend(; ncol=2, fontsize=12, loc="upper left", columnspacing=0.5)
     plt.tight_layout()
-    fig.savefig("oneshot_one_loop_F2_uu$(interactionstr)_vs_rs_$(chan).pdf")
+    fig.savefig("oneloop_F2_uu$(interactionstr)_vs_rs_$(chan).pdf")
     plt.close(fig)
 
     #########################
@@ -1017,7 +1193,7 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     ax.set_xlim(0, 10)
     ax.legend(; ncol=2, fontsize=12, loc="upper left", columnspacing=0.5)
     plt.tight_layout()
-    fig.savefig("oneshot_one_loop_F2_ud$(interactionstr)_vs_rs_$(chan).pdf")
+    fig.savefig("oneloop_F2_ud$(interactionstr)_vs_rs_$(chan).pdf")
     plt.close(fig)
 
     ##########################
@@ -1079,7 +1255,7 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     # ax.set_ylabel("\$F^s\$")
     ax.legend(; ncol=2, fontsize=12, loc="upper right", columnspacing=0.5)
     plt.tight_layout()
-    fig.savefig("oneshot_one_loop_F_s_and_a$(interactionstr)_vs_rs_$(chan).pdf")
+    fig.savefig("oneloop_F_s_and_a$(interactionstr)_vs_rs_$(chan).pdf")
     plt.close(fig)
 
     ########################
@@ -1141,7 +1317,7 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     ax.set_xlim(0, 10)
     ax.legend(; ncol=2, fontsize=12, loc="upper left", columnspacing=0.5)
     plt.tight_layout()
-    fig.savefig("oneshot_one_loop_F2_s$(interactionstr)_vs_rs_$(chan).pdf")
+    fig.savefig("oneloop_F2_s$(interactionstr)_vs_rs_$(chan).pdf")
     plt.close(fig)
 
     ########################
@@ -1197,7 +1373,7 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     ax.set_xlim(0, 10)
     ax.legend(; ncol=2, fontsize=12, loc="upper left", columnspacing=0.5)
     plt.tight_layout()
-    fig.savefig("oneshot_one_loop_F2_a$(interactionstr)_vs_rs_$(chan).pdf")
+    fig.savefig("oneloop_F2_a$(interactionstr)_vs_rs_$(chan).pdf")
     plt.close(fig)
 end
 

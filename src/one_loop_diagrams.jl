@@ -1,10 +1,184 @@
+"""
+Calculates and returns the specified one-loop box diagram contribution (Fs2bi, Fa2bi).
+The box diagram can be crossed or uncrossed, direct or exchange—all four combinations enter F2.
+"""
+function one_loop_box_diagram(
+    param::OneLoopParams;
+    is_direct::Bool,
+    is_crossed::Bool,
+    show_progress=false,
+)
+    @assert param.initialized "r(q, iνₘ) data not yet initialized!"
+    MPI.Init()
+    root = 0
+    comm = MPI.COMM_WORLD
+    rank = MPI.Comm_rank(comm)
+    comm_size = MPI.Comm_size(comm)
+
+    @unpack qgrid, θgrid, φgrid, θ12, rs, Fs, kF, NF, basic, paramc = param
+
+    # Initialize vertex integrand
+    Nq = length(qgrid.grid)
+    q_integrand_s = zeros(ComplexF64, Nq)
+
+    # Setup buffers for scatter/gather
+    counts = split_count(Nq, comm_size)  # number of values per rank
+    data_vbuffer_s = VBuffer(q_integrand_s, counts)
+    if rank == root
+        length_ubuf = UBuffer(counts, 1)
+        # For global indices
+        qi_vbuffer = VBuffer(collect(1:Nq), counts)
+    else
+        length_ubuf = UBuffer(nothing)
+        qi_vbuffer = VBuffer(nothing)
+    end
+
+    # Scatter the data to all ranks
+    local_length = MPI.Scatter(length_ubuf, Int, root, comm)
+    local_qi = MPI.Scatterv!(qi_vbuffer, zeros(Int, local_length), root, comm)
+    local_data_s =
+        MPI.Scatterv!(data_vbuffer_s, zeros(ComplexF64, local_length), root, comm)
+
+    # Compute the integrand over loop momentum magnitude q in parallel
+    progress_meter = Progress(
+        local_length;
+        desc="Progress (rank = 0): ",
+        output=stdout,
+        showspeed=true,
+        enabled=show_progress && rank == root,
+    )
+    θs_integrand = Vector{ComplexF64}(undef, length(θgrid.grid))
+    φs_integrand = Vector{ComplexF64}(undef, length(φgrid.grid))
+    for (i, qi) in enumerate(local_qi)
+        # println("rank = $rank: Integrating (q, 0) point $i/$local_length")
+        # Get external frequency and momentum at this index
+        q = qgrid.grid[qi]
+        for (iθ, θ) in enumerate(θgrid)
+            for (iφ, φ) in enumerate(φgrid)
+                φs_integrand[iφ] = box_matsubara_sum(
+                    param,
+                    q,
+                    θ,
+                    φ;
+                    is_direct=is_direct,
+                    is_crossed=is_crossed,
+                )
+            end
+            θs_integrand[iθ] = Interp.integrate1D(φs_integrand, φgrid)
+        end
+        local_data_s[i] = Interp.integrate1D(θs_integrand .* sin.(θgrid.grid), θgrid)
+        next!(progress_meter)
+    end
+    finish!(progress_meter)
+
+    # Collect q_integrand subresults from all ranks
+    MPI.Allgatherv!(local_data_s, data_vbuffer_s, comm)
+
+    # total integrand ~ NF
+    box_integrand_s = q_integrand_s / (NF * (2π)^3)
+
+    # Integrate over q
+    Fs2b = Interp.integrate1D(box_integrand_s, qgrid)
+
+    # NOTE: The spin-antisymmetric contribution vanishes for direct-type diagrams,
+    # and is identitcal to the spin-symmetric contribution for exchange-type diagrams.
+    is_exchange = !is_direct
+    Fa2b = is_exchange * Fs2b
+
+    return Fs2b, Fa2b
+end
 
 """
-Calculates and returns the one-loop vertex corrections (Fs2v, Fa2v):
+Calculates and returns the contribution from all one-loop box diagrams (Fs2b, Fa2b):
+
+    gg'RR' + exchange counterparts
+"""
+function one_loop_box_contribution(param::OneLoopParams; show_progress=false)
+    @assert param.initialized "r(q, iνₘ) data not yet initialized!"
+    MPI.Init()
+    root = 0
+    comm = MPI.COMM_WORLD
+    rank = MPI.Comm_rank(comm)
+    comm_size = MPI.Comm_size(comm)
+
+    @unpack qgrid, θgrid, φgrid, θ12, rs, Fs, kF, NF, basic, paramc = param
+
+    # Initialize vertex integrand
+    Nq = length(qgrid.grid)
+    q_integrand_s = zeros(ComplexF64, Nq)
+    q_integrand_a = zeros(ComplexF64, Nq)
+
+    # Setup buffers for scatter/gather
+    counts = split_count(Nq, comm_size)  # number of values per rank
+    data_vbuffer_s = VBuffer(q_integrand_s, counts)
+    data_vbuffer_a = VBuffer(q_integrand_a, counts)
+    if rank == root
+        length_ubuf = UBuffer(counts, 1)
+        # For global indices
+        qi_vbuffer = VBuffer(collect(1:Nq), counts)
+    else
+        length_ubuf = UBuffer(nothing)
+        qi_vbuffer = VBuffer(nothing)
+    end
+
+    # Scatter the data to all ranks
+    local_length = MPI.Scatter(length_ubuf, Int, root, comm)
+    local_qi = MPI.Scatterv!(qi_vbuffer, zeros(Int, local_length), root, comm)
+    local_data_s =
+        MPI.Scatterv!(data_vbuffer_s, zeros(ComplexF64, local_length), root, comm)
+    local_data_a =
+        MPI.Scatterv!(data_vbuffer_a, zeros(ComplexF64, local_length), root, comm)
+
+    # Compute the integrand over loop momentum magnitude q in parallel
+    progress_meter = Progress(
+        local_length;
+        desc="Progress (rank = 0): ",
+        output=stdout,
+        showspeed=true,
+        enabled=show_progress && rank == root,
+    )
+    θs_integrand = Vector{ComplexF64}(undef, length(θgrid.grid))
+    θa_integrand = Vector{ComplexF64}(undef, length(θgrid.grid))
+    φs_integrand = Vector{ComplexF64}(undef, length(φgrid.grid))
+    φa_integrand = Vector{ComplexF64}(undef, length(φgrid.grid))
+    for (i, qi) in enumerate(local_qi)
+        # println("rank = $rank: Integrating (q, 0) point $i/$local_length")
+        # Get external frequency and momentum at this index
+        q = qgrid.grid[qi]
+        for (iθ, θ) in enumerate(θgrid)
+            for (iφ, φ) in enumerate(φgrid)
+                φs_integrand[iφ] = box_matsubara_sum(param, q, θ, φ, "Fs")
+                φa_integrand[iφ] = box_matsubara_sum(param, q, θ, φ, "Fa")
+            end
+            θs_integrand[iθ] = Interp.integrate1D(φs_integrand, φgrid)
+            θa_integrand[iθ] = Interp.integrate1D(φa_integrand, φgrid)
+        end
+        local_data_s[i] = Interp.integrate1D(θs_integrand .* sin.(θgrid.grid), θgrid)
+        local_data_a[i] = Interp.integrate1D(θa_integrand .* sin.(θgrid.grid), θgrid)
+        next!(progress_meter)
+    end
+    finish!(progress_meter)
+
+    # Collect q_integrand subresults from all ranks
+    MPI.Allgatherv!(local_data_s, data_vbuffer_s, comm)
+    MPI.Allgatherv!(local_data_a, data_vbuffer_a, comm)
+
+    # total integrand ~ NF
+    box_integrand_s = q_integrand_s / (NF * (2π)^3)
+    box_integrand_a = q_integrand_a / (NF * (2π)^3)
+
+    # Integrate over q
+    Fs2b = Interp.integrate1D(box_integrand_s, qgrid)
+    Fa2b = Interp.integrate1D(box_integrand_a, qgrid)
+    return Fs2b, Fa2b
+end
+
+"""
+Calculates and returns the contribution from (identital left/right) one-loop vertex corrections (Fs2v, Fa2v):
 
     2 Λ₁(θ₁₂) r(|k₁ - k₂|, 0)
 """
-function one_loop_vertex_corrections(param::OneLoopParams; show_progress=false)
+function one_loop_vertex_contribution(param::OneLoopParams; show_progress=false)
     @assert param.initialized "R(q, iνₘ) data not yet initialized!"
     MPI.Init()
     root = 0
@@ -69,235 +243,39 @@ function one_loop_vertex_corrections(param::OneLoopParams; show_progress=false)
     # Integrate over q
     k_m_kp = kF * sqrt(2 * (1 - cos(θ12)))
     # Fᵥ(θ₁₂) = Λ₁(θ₁₂) r(|k₁ - k₂|, 0)
+    # NOTE: only exchange-type vertex corrections enter ⟹ Fs2v = Fa2v
     Fs2v = Fa2v = Interp.integrate1D(vertex_integrand, qgrid) * r_interp(param, k_m_kp, 0)
     return Fs2v, Fa2v
 end
 
 """
-Calculates and returns all one-loop box diagrams (Fs2b, Fa2b):
-
-    gg'RR' + exchange counterparts
+Separately calculates and returns all four one-loop box-type contributions to Fs2 and Fa2.
+The box diagrams can be crossed or uncrossed, direct or exchange—all four combinations enter F2.
 """
-function one_loop_box_diagrams(param::OneLoopParams; show_progress=false)
-    @assert param.initialized "r(q, iνₘ) data not yet initialized!"
-    MPI.Init()
-    root = 0
-    comm = MPI.COMM_WORLD
-    rank = MPI.Comm_rank(comm)
-    comm_size = MPI.Comm_size(comm)
-
-    @unpack qgrid, θgrid, φgrid, θ12, rs, Fs, kF, NF, basic, paramc = param
-
-    # Initialize vertex integrand
-    Nq = length(qgrid.grid)
-    q_integrand_s = zeros(ComplexF64, Nq)
-    q_integrand_a = zeros(ComplexF64, Nq)
-
-    # Setup buffers for scatter/gather
-    counts = split_count(Nq, comm_size)  # number of values per rank
-    data_vbuffer_s = VBuffer(q_integrand_s, counts)
-    data_vbuffer_a = VBuffer(q_integrand_a, counts)
-    if rank == root
-        length_ubuf = UBuffer(counts, 1)
-        # For global indices
-        qi_vbuffer = VBuffer(collect(1:Nq), counts)
-    else
-        length_ubuf = UBuffer(nothing)
-        qi_vbuffer = VBuffer(nothing)
-    end
-
-    # Scatter the data to all ranks
-    local_length = MPI.Scatter(length_ubuf, Int, root, comm)
-    local_qi = MPI.Scatterv!(qi_vbuffer, zeros(Int, local_length), root, comm)
-    local_data_s =
-        MPI.Scatterv!(data_vbuffer_s, zeros(ComplexF64, local_length), root, comm)
-    local_data_a =
-        MPI.Scatterv!(data_vbuffer_a, zeros(ComplexF64, local_length), root, comm)
-
-    # Compute the integrand over loop momentum magnitude q in parallel
-    progress_meter = Progress(
-        local_length;
-        desc="Progress (rank = 0): ",
-        output=stdout,
-        showspeed=true,
-        enabled=show_progress && rank == root,
-    )
-    θs_integrand = Vector{ComplexF64}(undef, length(θgrid.grid))
-    θa_integrand = Vector{ComplexF64}(undef, length(θgrid.grid))
-    φs_integrand = Vector{ComplexF64}(undef, length(φgrid.grid))
-    φa_integrand = Vector{ComplexF64}(undef, length(φgrid.grid))
-    for (i, qi) in enumerate(local_qi)
-        # println("rank = $rank: Integrating (q, 0) point $i/$local_length")
-        # Get external frequency and momentum at this index
-        q = qgrid.grid[qi]
-        for (iθ, θ) in enumerate(θgrid)
-            for (iφ, φ) in enumerate(φgrid)
-                φs_integrand[iφ] = box_matsubara_sum(param, q, θ, φ; ftype="Fs")
-                φa_integrand[iφ] = box_matsubara_sum(param, q, θ, φ; ftype="Fa")
-            end
-            θs_integrand[iθ] = Interp.integrate1D(φs_integrand, φgrid)
-            θa_integrand[iθ] = Interp.integrate1D(φa_integrand, φgrid)
-        end
-        local_data_s[i] = Interp.integrate1D(θs_integrand .* sin.(θgrid.grid), θgrid)
-        local_data_a[i] = Interp.integrate1D(θa_integrand .* sin.(θgrid.grid), θgrid)
-        next!(progress_meter)
-    end
-    finish!(progress_meter)
-
-    # Collect q_integrand subresults from all ranks
-    MPI.Allgatherv!(local_data_s, data_vbuffer_s, comm)
-    MPI.Allgatherv!(local_data_a, data_vbuffer_a, comm)
-
-    # total integrand ~ NF
-    box_integrand_s = q_integrand_s / (NF * (2π)^3)
-    box_integrand_a = q_integrand_a / (NF * (2π)^3)
-
-    # Integrate over q
-    Fs2b = Interp.integrate1D(box_integrand_s, qgrid)
-    Fa2b = Interp.integrate1D(box_integrand_a, qgrid)
-    return Fs2b, Fa2b
-end
-
-"""
-Calculates and returns all one-loop box diagrams of direct type:
-
-    gg'RR'
-"""
-function one_loop_direct_box_diagrams(
+function get_one_loop_box_contributions(
     param::OneLoopParams;
-    show_progress=false,
-    which="both",
+    verbose=false,
+    show_progress=true,
 )
-    @assert param.initialized "r(q, iνₘ) data not yet initialized!"
-    @assert which in ["both", "uncrossed", "crossed"]
-    MPI.Init()
-    root = 0
-    comm = MPI.COMM_WORLD
-    rank = MPI.Comm_rank(comm)
-    comm_size = MPI.Comm_size(comm)
-
-    @unpack qgrid, θgrid, φgrid, θ12, rs, Fs, kF, NF, basic, paramc = param
-
-    # Initialize vertex integrand
-    Nq = length(qgrid.grid)
-    q_integrand = zeros(ComplexF64, Nq)
-
-    # Setup buffers for scatter/gather
-    counts = split_count(Nq, comm_size)  # number of values per rank
-    data_vbuffer = VBuffer(q_integrand, counts)
-    if rank == root
-        length_ubuf = UBuffer(counts, 1)
-        # For global indices
-        qi_vbuffer = VBuffer(collect(1:Nq), counts)
-    else
-        length_ubuf = UBuffer(nothing)
-        qi_vbuffer = VBuffer(nothing)
+    F2b_terms = []
+    for boxtype in boxtypes
+        is_direct, is_crossed = boxtype
+        F2b_term =
+            real.(
+                one_loop_box_diagram(
+                    param;
+                    is_direct=is_direct,
+                    is_crossed=is_crossed,
+                    show_progress=show_progress,
+                )
+            )
+        push!(F2b_terms, F2b_term)
     end
-
-    # Scatter the data to all ranks
-    local_length = MPI.Scatter(length_ubuf, Int, root, comm)
-    local_qi = MPI.Scatterv!(qi_vbuffer, zeros(Int, local_length), root, comm)
-    local_data = MPI.Scatterv!(data_vbuffer, zeros(ComplexF64, local_length), root, comm)
-
-    # Compute the integrand over loop momentum magnitude q in parallel
-    progress_meter = Progress(
-        local_length;
-        desc="Progress (rank = 0): ",
-        output=stdout,
-        showspeed=true,
-        enabled=show_progress && rank == root,
-    )
-    θ_integrand = Vector{ComplexF64}(undef, length(θgrid.grid))
-    φ_integrand = Vector{ComplexF64}(undef, length(φgrid.grid))
-    for (i, qi) in enumerate(local_qi)
-        # println("rank = $rank: Integrating (q, 0) point $i/$local_length")
-        # Get external frequency and momentum at this index
-        q = qgrid.grid[qi]
-        for (iθ, θ) in enumerate(θgrid)
-            for (iφ, φ) in enumerate(φgrid)
-                φ_integrand[iφ] = direct_box_matsubara_sum(param, q, θ, φ; which=which)
-            end
-            θ_integrand[iθ] = Interp.integrate1D(φ_integrand, φgrid)
-        end
-        local_data[i] = Interp.integrate1D(θ_integrand .* sin.(θgrid.grid), θgrid)
-        next!(progress_meter)
-    end
-    finish!(progress_meter)
-
-    # Collect q_integrand subresults from all ranks
-    MPI.Allgatherv!(local_data, data_vbuffer, comm)
-
-    # total integrand ~ NF
-    box_integrand = q_integrand / (NF * (2π)^3)
-
-    # Integrate over q
-    result = Interp.integrate1D(box_integrand, qgrid)
-    return result
-end
-
-"""
-Calculates and returns the total counterterm contribution to F2s and F2a:
-
-    2R(z1 - f1 Π0) - f1 Π0 f1 (+ R Π0 R)
-"""
-function one_loop_counterterms(paramc::UEG.ParaMC)
-    @unpack rs, kF, EF, NF, Fs, basic, isDynamic = paramc
-    if isDynamic == false
-        @assert paramc.mass2 ≈ paramc.qTF^2 "Counterterms currently only implemented for the Thomas-Fermi interaction (Yukawa mass = qTF)!"
-    end
-    rstilde = rs * alpha_ueg / π
-
-    # x = |k - k'| / 2kF
-    xgrid = CompositeGrid.LogDensedGrid(:gauss, [0.0, 1.0], [0.0, 1.0], 16, 1e-8, 16)
-
-    # NF * ⟨R⟩ = -x N_F R(2kF x, 0)
-    F1 = get_F1(paramc)
-
-    # x R(2kF x, 0)
-    x_NF_R = isDynamic ? x_NF_R0 : x_NF_VTF
-    x_R0 = [x_NF_R(x, rstilde, Fs) / NF for x in xgrid]
-
-    # Z_1(kF)
-    z1 = get_Z1(paramc, 2 * kF * xgrid)
-
-    # Π₀(q, iν=0) = -NF * 𝓁(q / 2kF)
-    Π0 = -NF * lindhard.(xgrid)
-
-    # A = z₁ + ∫₀¹ dx x R(x, 0) Π₀(x, 0)
-    A = z1 + Interp.integrate1D(x_R0 .* Π0, xgrid)
-
-    # B = ∫₀¹ dx x Π₀(x, 0) / NF
-    B = Interp.integrate1D(xgrid .* Π0 / NF, xgrid)
-
-    # (NF/2)*⟨2R(z1 - f1 Π0) - f1 Π0 f1⟩ = -2 F1 A - F1² B
-    Fs2ct = Fa2ct = -(2 * F1 * A + F1^2 * B)
-    return Fs2ct, Fa2ct
-end
-function one_loop_counterterms(param::OneLoopParams)
-    return one_loop_counterterms(param.paramc)
-end
-
-function one_loop_bubble_counterterm(param::OneLoopParams)
-    @unpack rs, kF, EF, NF, Fs, basic, isDynamic = param
-    if isDynamic == false
-        @assert param.mass2 ≈ param.qTF^2 "Counterterms currently only implemented for the Thomas-Fermi interaction (Yukawa mass = qTF)!"
-    end
-    rstilde = rs * alpha_ueg / π
-
-    # x = |k - k'| / 2kF
-    xgrid = CompositeGrid.LogDensedGrid(:gauss, [0.0, 1.0], [0.0, 1.0], 16, 1e-8, 16)
-
-    # x R(2kF x, 0)
-    x_NF2_R2 = isDynamic ? x_NF2_R02 : x_NF2_VTF2
-    x_R02 = [x_NF2_R2(x, rstilde, Fs) / NF^2 for x in xgrid]
-
-    # Π₀(q, iν=0) = -NF * 𝓁(q / 2kF)
-    Π0 = -NF * lindhard.(xgrid)
-
-    # NF ⟨R Π₀ R⟩
-    Fs2bct = Interp.integrate1D(NF .* x_R02 .* Π0, xgrid)
-    Fa2bct = 0.0  # bubble counterterm vanishes for direct diagrams (it is improper)
-    return Fs2bct, Fa2bct
+    boxdiags_sa = OneLoopBoxDiagrams(F2b_terms...)
+    boxdiags_ud = sa2ud(boxdiags_sa)
+    verbose && println_root("(s, a):\n$boxdiags_sa")
+    verbose && println_root("(↑↑, ↑↓):\n$boxdiags_ud")
+    return boxdiags_sa, boxdiags_ud
 end
 
 """
@@ -312,8 +290,8 @@ function get_one_loop_Fs(
     Fs1 = Fa1 = get_F1(param)
     F1 = (Fs1, Fa1)
 
-    F2v = real.(one_loop_vertex_corrections(param))
-    F2b = real.(one_loop_box_diagrams(param))
+    F2v = real.(one_loop_vertex_contribution(param))
+    F2b = real.(one_loop_box_contribution(param))
     # F2bubble = real.(one_loop_bubble_diagram(param))
 
     F2ct = real.(one_loop_counterterms(param))
@@ -361,7 +339,7 @@ function get_one_loop_Fs(
     return oneloop_sa, oneloop_ud
 end
 
-function get_one_loop_diagrams(rs, beta, mass2=0.0, Fs=0.0, chan=:PH, remove_bubble=true)
+function get_one_loop_graphs(rs, beta, mass2=0.0, Fs=0.0, chan=:PH, remove_bubble=true)
     # One-loop => only interaction-type counterterms
     partitions = UEG.partition(1; offset=0)  # TEST: G-type counterterms should be removed by Diagram.diagram_parquet_response!
 
@@ -377,11 +355,11 @@ function get_one_loop_diagrams(rs, beta, mass2=0.0, Fs=0.0, chan=:PH, remove_bub
     # Proper => only exchange and box-type direct diagrams contribute to F₂
     filters = remove_bubble ? [Proper, NoHartree, NoBubble] : [Proper, NoHartree]
 
-    # PP loopBasis: (k1, k2, Q - k1, ...)
-    # PH loopBasis: (k1, k1 + Q, k2, ...)
     if chan == :PP
+        # (k1, k2, Q - k1, ...)
         idx_k1, idx_k2 = 1, 2
     else
+        # (k1, k1 + Q, k2, ...)
         idx_k1, idx_k2 = 1, 3
     end
 
@@ -427,11 +405,11 @@ function get_yukawa_one_loop_neft(
     # Bubble diagram cancelled exactly in CTs => NoBubble
     filters = [Proper, NoHartree, NoBubble]
 
-    # PP loopBasis: (k1, k2, Q - k1, ...)
-    # PH loopBasis: (k1, k1 + Q, k2, ...)
     if chan == :PP
+        # (k1, k2, Q - k1, ...)
         idx_k1, idx_k2 = 1, 2
     else
+        # (k1, k1 + Q, k2, ...)
         idx_k1, idx_k2 = 1, 3
     end
 
@@ -503,9 +481,6 @@ function get_yukawa_one_loop_neft(
             else
                 F2z = measurement.((0.0, 0.0))
             end
-            println(F2d)
-            println(F2ct)
-            println(F2z)
             Fuu2 = F2d[1] + F2ct[1] + F2z[1]
             Fud2 = F2d[2] + F2ct[2] + F2z[2]
             F2 = (Fuu2, Fud2)

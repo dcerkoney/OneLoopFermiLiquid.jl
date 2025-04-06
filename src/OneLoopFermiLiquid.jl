@@ -45,23 +45,58 @@ include("tree_level.jl")
 export get_tree_level_self_consistent_Fs, get_F1, get_F1_TF, get_Z1
 export Σ1, integrand_F1, x_NF_R0, x_NF_VTF, x_NF2_R02, x_NF2_VTF2
 
-include("vertex_summands.jl")
-export vertex_matsubara_summand
-
-include("box_summands.jl")
-export box_matsubara_summand, direct_box_matsubara_summand
+include("matsubara_summands.jl")
+export box_matsubara_summand, vertex_matsubara_summand
 
 include("matsubara_sums.jl")
-export vertex_matsubara_sum, box_matsubara_sum, direct_box_matsubara_sum
+export box_matsubara_sum, vertex_matsubara_sum
 
-include("one_loop.jl")
+include("one_loop_counterterms.jl")
+export one_loop_counterterms, one_loop_bubble_counterterm
+
+include("one_loop_diagrams.jl")
 export initialize_one_loop_params!,
-    get_one_loop_Fs, get_yukawa_one_loop_neft, get_one_loop_diagrams
-export one_loop_vertex_corrections,
-    one_loop_box_diagrams, one_loop_direct_box_diagrams, one_loop_counterterms
+    get_one_loop_Fs,
+    get_one_loop_box_contributions,
+    get_yukawa_one_loop_neft,
+    get_one_loop_graphs
+export one_loop_box_diagram, one_loop_box_contribution, one_loop_vertex_contribution
 
 const alpha_ueg = (4 / 9π)^(1 / 3)
 export alpha_ueg
+
+const boxtypes = [
+    (true, true),    # direct crossed
+    (true, false),   # direct uncrossed
+    (false, true),   # exchange crossed
+    (false, false),  # exchange uncrossed
+]
+
+struct OneLoopBoxDiagrams{T}
+    F2b_direct_crossed::Tuple{T,T}
+    F2b_direct_uncrossed::Tuple{T,T}
+    F2b_exchange_crossed::Tuple{T,T}
+    F2b_exchange_uncrossed::Tuple{T,T}
+end
+export OneLoopBoxDiagrams
+
+# Overload show for OneLoopBoxDiagrams
+function Base.show(io::IO, boxdiags::OneLoopBoxDiagrams{T}) where {T}
+    println(io, "OneLoopBoxDiagrams:")
+    println(io, "  F2b (Di,   crossed) = ", boxdiags.F2b_direct_crossed, "ξ²")
+    println(io, "  F2b (Di, uncrossed) = ", boxdiags.F2b_direct_uncrossed, "ξ²")
+    println(io, "  F2b (Ex,   crossed) = ", boxdiags.F2b_exchange_crossed, "ξ²")
+    println(io, "  F2b (Ex, uncrossed) = ", boxdiags.F2b_exchange_uncrossed, "ξ²")
+end
+
+function map(func, boxdiags::OneLoopBoxDiagrams)
+    return OneLoopBoxDiagrams(
+        func(boxdiags.F2b_direct_crossed...),
+        func(boxdiags.F2b_direct_uncrossed...),
+        func(boxdiags.F2b_exchange_crossed...),
+        func(boxdiags.F2b_exchange_uncrossed...),
+    )
+end
 
 struct OneLoopResult{T}
     F1::Tuple{T,T}
@@ -77,7 +112,7 @@ struct OneLoopResult{T}
 end
 export OneLoopResult
 
-# Overload println for OneLoopResult
+# Overload show for OneLoopResult
 function Base.show(io::IO, oneloop::OneLoopResult{T}) where {T}
     println(io, "OneLoopResult:")
     println(io, "  F1 = ", oneloop.F1, "ξ")
@@ -107,11 +142,13 @@ function map(func, oneloop::OneLoopResult)
     )
 end
 
-function sa2ud(oneloop_sa::OneLoopResult)
+const OneLoopMeasTypes = Union{OneLoopBoxDiagrams,OneLoopResult}
+
+function sa2ud(oneloop_sa::T) where {T<:OneLoopMeasTypes}
     return map(Ver4.sa2ud, oneloop_sa)
 end
 
-function ud2sa(oneloop_ud::OneLoopResult)
+function ud2sa(oneloop_ud::T) where {T<:OneLoopMeasTypes}
     return map(Ver4.ud2sa, oneloop_ud)
 end
 

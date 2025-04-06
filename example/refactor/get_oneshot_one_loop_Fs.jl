@@ -979,7 +979,7 @@ function plot_direct_box_matsubara_sum(param::OneLoopParams; which="both")
 end
 
 # 2RΛ₁
-function one_loop_vertex_corrections(param::OneLoopParams; show_progress=false)
+function one_loop_vertex_contribution(param::OneLoopParams; show_progress=false)
     @assert param.initialized "R(q, iνₘ) data not yet initialized!"
     MPI.Init()
     root = 0
@@ -1049,7 +1049,7 @@ function one_loop_vertex_corrections(param::OneLoopParams; show_progress=false)
 end
 
 # gg'RR' + exchange counterpart
-function one_loop_box_diagrams(param::OneLoopParams; show_progress=false, ftype="fs")
+function one_loop_box_contribution(param::OneLoopParams; show_progress=false, ftype="fs")
     @assert param.initialized "r(q, iνₘ) data not yet initialized!"
     @assert ftype in ["Fs", "Fa"]
     MPI.Init()
@@ -1207,10 +1207,10 @@ function get_one_loop_Fs(
             F1 = param.isDynamic ? get_F1(param) : get_F1_TF(param.rs)
             println_root("F1 = ($(F1))ξ")
 
-            F2v = real(one_loop_vertex_corrections(param; kwargs...))
+            F2v = real(one_loop_vertex_contribution(param; kwargs...))
             println_root("F2v = ($(F2v))ξ²")
 
-            F2b = real(one_loop_box_diagrams(param; ftype=ftype, kwargs...))
+            F2b = real(one_loop_box_contribution(param; ftype=ftype, kwargs...))
             println_root("F2b = ($(F2b))ξ²")
 
             F2ct = real(one_loop_counterterms(param; kwargs...))
@@ -1230,8 +1230,8 @@ function get_one_loop_Fs(
             return F1, F2v, F2b, F2ct, F2z, F2
         else
             F1 = get_F1(param)
-            F2v = real(one_loop_vertex_corrections(param; kwargs...))
-            F2b = real(one_loop_box_diagrams(param; kwargs...))
+            F2v = real(one_loop_vertex_contribution(param; kwargs...))
+            F2b = real(one_loop_box_contribution(param; kwargs...))
             F2ct = real(one_loop_counterterms(param; kwargs...))
             if z_renorm
                 z1 = get_Z1(param)

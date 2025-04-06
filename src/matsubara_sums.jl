@@ -9,17 +9,15 @@ function perform_bosonic_matsubara_sum(
     φ;
     kwargs...,
 )
+    @unpack mgrid, Mmax = param
+    # Evaluate summand S(iνₘ) over the frequency mesh specified in `param`
+    s_ivm = matsubara_summand(param, q, θ, φ; kwargs...)
+    # interpolate data for S(iνₘ) over entire frequency mesh from 0 to Mmax
+    summand = Interp.interp1DGrid(s_ivm, mgrid, 0:Mmax)
     # sum over iνₘ including negative frequency terms (S(iνₘ) = S(-iνₘ))
-    summand = matsubara_summand(param, q, θ, φ; kwargs...)
     matsubara_sum = summand[1] + 2 * sum(summand[2:end])
     return matsubara_sum
 end
-
-"""
-Evaluates the Matsubara sum for all (identical left/right) vertex corrections.
-"""
-vertex_matsubara_sum(param::OneLoopParams, q, θ, φ) =
-    perform_bosonic_matsubara_sum(param, vertex_matsubara_summand, q, θ, φ)
 
 """
 Evaluates the Matsubara sum for the specified one-loop box diagram.
@@ -39,18 +37,11 @@ box_matsubara_sum(param::OneLoopParams, q, θ, φ; is_direct::Bool, is_crossed::
 """
 Evaluates the Matsubara sum for all box diagrams.
 """
-box_matsubara_sum(param::OneLoopParams, q, θ, φ; ftype="fs") =
+box_matsubara_sum(param::OneLoopParams, q, θ, φ, ftype) =
     perform_bosonic_matsubara_sum(param, box_matsubara_summand, q, θ, φ; ftype=ftype)
 
 """
-Evaluates the Matsubara sum for all direct box diagrams.
+Evaluates the Matsubara sum for the vertex corrections Λ₁(θ₁₂).
 """
-direct_box_matsubara_sum(param::OneLoopParams, q, θ, φ; which="both") =
-    perform_bosonic_matsubara_sum(
-        param,
-        direct_box_matsubara_summand,
-        q,
-        θ,
-        φ;
-        which=which,
-    )
+vertex_matsubara_sum(param::OneLoopParams, q, θ, φ) =
+    perform_bosonic_matsubara_sum(param, vertex_matsubara_summand, q, θ, φ)

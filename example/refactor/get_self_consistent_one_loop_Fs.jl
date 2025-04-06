@@ -470,7 +470,7 @@ function box_matsubara_sum(param::OneLoopParams, q, θ, φ)
 end
 
 # 2RΛ₁
-function one_loop_vertex_corrections(param::OneLoopParams; show_progress=true)
+function one_loop_vertex_contribution(param::OneLoopParams; show_progress=true)
     @assert param.initialized "R(q, iνₘ) data not yet initialized!"
     MPI.Init()
     root = 0
@@ -540,7 +540,7 @@ function one_loop_vertex_corrections(param::OneLoopParams; show_progress=true)
 end
 
 # gg'RR' + exchange counterpart
-function one_loop_box_diagrams(param::OneLoopParams; show_progress=true)
+function one_loop_box_contribution(param::OneLoopParams; show_progress=true)
     @assert param.initialized "R(q, iνₘ) data not yet initialized!"
     MPI.Init()
     root = 0
@@ -618,10 +618,10 @@ function get_one_loop_Fs(param::OneLoopParams; verbose=false, show_progress=verb
             F1 = get_F1(param)
             println_root("F1 = ($(F1))ξ")
 
-            F2v = real(one_loop_vertex_corrections(param; kwargs...))
+            F2v = real(one_loop_vertex_contribution(param; kwargs...))
             println_root("F2v = ($(F2v))ξ²")
 
-            F2b = real(one_loop_box_diagrams(param; kwargs...))
+            F2b = real(one_loop_box_contribution(param; kwargs...))
             println_root("F2b = ($(F2b))ξ²")
 
             F2ct = real(one_loop_counterterms(param; kwargs...))
@@ -631,8 +631,8 @@ function get_one_loop_Fs(param::OneLoopParams; verbose=false, show_progress=verb
             println_root("F2 = ($(F1))ξ + ($(F2))ξ²")
             return F2
         else
-            return one_loop_vertex_corrections(param; kwargs...) +
-                   one_loop_box_diagrams(param; kwargs...) +
+            return one_loop_vertex_contribution(param; kwargs...) +
+                   one_loop_box_contribution(param; kwargs...) +
                    one_loop_counterterms(param; kwargs...)
         end
     end
