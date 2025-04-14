@@ -248,6 +248,13 @@ function one_loop_vertex_contribution(param::OneLoopParams; show_progress=false)
     return Fs2v, Fa2v
 end
 
+const boxtype_to_args = Dict{OneLoopGraphType,Tuple{Bool,Bool}}(
+    direct_crossed_box => (true, true),
+    direct_uncrossed_box => (true, false),
+    exchange_crossed_box => (false, true),
+    exchange_uncrossed_box => (false, false),
+)
+
 """
 Separately calculates and returns all four one-loop box-type contributions to Fs2 and Fa2.
 The box diagrams can be crossed or uncrossed, direct or exchange—all four combinations enter F2.
@@ -259,7 +266,7 @@ function get_one_loop_box_contributions(
 )
     F2b_terms = []
     for boxtype in boxtypes
-        is_direct, is_crossed = boxtype
+        is_direct, is_crossed = boxtype_to_args[boxtype]
         F2b_term =
             real.(
                 one_loop_box_diagram(
@@ -337,174 +344,4 @@ function get_one_loop_Fs(
     verbose && println_root("(s, a):\n$oneloop_sa")
     verbose && println_root("(↑↑, ↑↓):\n$oneloop_ud")
     return oneloop_sa, oneloop_ud
-end
-
-function get_one_loop_graphs(rs, beta, mass2=0.0, Fs=0.0, chan=:PH, remove_bubble=true)
-    # One-loop => only interaction-type counterterms
-    partitions = UEG.partition(1; offset=0)  # TEST: G-type counterterms should be removed by Diagram.diagram_parquet_response!
-
-    dummy_paramc = ElectronLiquid.ParaMC(;
-        rs=rs,
-        beta=beta,
-        Fs=Fs,
-        order=1,
-        mass2=mass2,
-        isDynamic=false,
-    )
-
-    # Proper => only exchange and box-type direct diagrams contribute to F₂
-    filters = remove_bubble ? [Proper, NoHartree, NoBubble] : [Proper, NoHartree]
-
-    if chan == :PP
-        # (k1, k2, Q - k1, ...)
-        idx_k1, idx_k2 = 1, 2
-    else
-        # (k1, k1 + Q, k2, ...)
-        idx_k1, idx_k2 = 1, 3
-    end
-
-    # Setup forward-scattering extK and zero transfer momentum ((Q,Ω) → 0 limit)
-    KinL, KoutL, KinR, KoutR = zeros(16), zeros(16), zeros(16), zeros(16)
-    KinL[idx_k1] = KoutL[idx_k1] = 1  # k1  →  k1
-    KinR[idx_k2] = KoutR[idx_k2] = 1  # k2 →  k2
-    Q = KinL - KoutL        # Q = 0
-    extK = (KinL, KoutL, KinR, KoutR)
-
-    diagrams = Diagram.diagram_parquet_response(
-        :vertex4,
-        dummy_paramc,
-        partitions;
-        filter=filters,
-        transferLoop=Q,  # (Q,Ω) → 0
-        extK=extK,
-    )
-
-    # returns: (partition, diagpara, FeynGraphs, extT_labels, spin_conventions)
-    # graphs contain: {{↑↑ diags}, {↑↓ diags}}
-    return diagrams
-end
-
-"""
-Benchmark for the one-loop calculation of F for the Yukawa-type theory using the NEFT toolbox.
-To this end, we use the exactly-computed counterterms δ_R of the full theory with the replacement R = VTF,
-rather than the NEFT default δ_λ for static interactions.
-"""
-function get_yukawa_one_loop_neft(
-    rslist,
-    beta;
-    neval=1e6,
-    seed=1234,
-    chan=:PH,
-    z_renorm=false,
-    noTransferMomentum=true,
-)
-    # We calculate the counterterms and tree-level diagram exactly
-    partitions = [(1, 0, 0)]
-
-    # Proper => only exchange and box-type direct diagrams contribute to F₂
-    # Bubble diagram cancelled exactly in CTs => NoBubble
-    filters = [Proper, NoHartree, NoBubble]
-
-    if chan == :PP
-        # (k1, k2, Q - k1, ...)
-        idx_k1, idx_k2 = 1, 2
-    else
-        # (k1, k1 + Q, k2, ...)
-        idx_k1, idx_k2 = 1, 3
-    end
-
-    # Setup forward-scattering extK and zero transfer momentum ((Q,Ω) → 0 limit)
-    KinL, KoutL, KinR, KoutR = zeros(16), zeros(16), zeros(16), zeros(16)
-    KinL[idx_k1] = KoutL[idx_k1] = 1  # k1  →  k1
-    KinR[idx_k2] = KoutR[idx_k2] = 1  # k2 →  k2
-    transferLoop = KinL - KoutL       # Q = 0
-    extK = (KinL, KoutL, KinR, KoutR)
-
-    # TODO: Determine which of these is correct (matters for dynamic interactions!)
-    #       with -1, we have a transfer frequency of iν₁ = i2πT, and with all zeros,
-    #       we have iν₀ = 0.
-    if noTransferMomentum
-        transferFrequencyIndices = [0, 0, 0]
-    else
-        transferFrequencyIndices = [-1, 0, 0]
-    end
-
-    # diagrams = get_one_loop_graphs(0.01, beta)
-    # graphs = diagrams[3]
-    # isUpUp =
-    #     Dict(P => [g.properties.response == UpUp for g in graphs[P]] for P in keys(graphs))
-    # isUpDown = Dict(
-    #     P => [g.properties.response == UpDown for g in graphs[P]] for P in keys(graphs)
-    # )
-
-    oneloop_neft_sa = []
-    oneloop_neft_ud = []
-    for rs in rslist
-        println("\nrs = $rs:")
-        qTF = Parameter.rydbergUnit(1.0 / beta, rs, 3).qTF
-        paramc = ElectronLiquid.ParaMC(;
-            rs=rs,
-            beta=beta,
-            Fs=0.0,
-            order=1,
-            mass2=qTF^2,  # for a particularly simple dimensionless interaction
-            isDynamic=false,
-        )
-        @unpack e0, NF, mass2, basic = paramc
-        data, result = Ver4.MC_lavg(
-            paramc;
-            neval=neval,
-            n=transferFrequencyIndices,
-            l=[0],
-            filter=filters,
-            partition=partitions,
-            transferLoop=transferLoop,
-            extK=extK,
-            seed=seed,
-            print=-1,
-            chan=chan,
-        )
-        if isnothing(data) == false
-            # one-loop diagrams from NEFT toolbox
-            F2d = Tuple(real(data[partitions[1]]))
-            # tree-level F1↑↑ and F1↑↓ calculated exactly
-            Fs1 = Fa1 = get_F1_TF(rs)
-            F1 = measurement.((Ver4.sa2ud(Fs1, Fa1)))  # = (2 * get_F1_TF(rs), 0.0)
-            # one-loop R-type counterterms calculated exactly
-            Fs2ct, Fa2ct = real.(one_loop_counterterms(paramc))
-            F2ct = measurement.((Ver4.sa2ud(Fs2ct, Fa2ct)))
-            # z²⟨Γ⟩ = (1 + z₁ξ + ...)²⟨Γ⟩ = 2z₁F₁ξ²
-            if z_renorm
-                z1 = get_Z1(param)
-                Fs2z = Fa2z = 2 * z1 * F1
-                F2z = measurement.((Fs2z, Fa2z))
-            else
-                F2z = measurement.((0.0, 0.0))
-            end
-            Fuu2 = F2d[1] + F2ct[1] + F2z[1]
-            Fud2 = F2d[2] + F2ct[2] + F2z[2]
-            F2 = (Fuu2, Fud2)
-            Fuu = F1[1] + F2[1]
-            Fud = F1[2] + F2[2]
-            F = (Fuu, Fud)
-            no_meas = measurement.((NaN, NaN))
-            oneloop_ud = OneLoopResult(
-                F1,
-                no_meas,
-                no_meas,
-                # no_meas,
-                F2d,
-                F2ct,
-                # no_meas,
-                F2z,
-                F2,
-                F,
-            )
-            oneloop_sa = ud2sa(oneloop_ud)
-            push!(oneloop_neft_sa, oneloop_sa)
-            push!(oneloop_neft_ud, oneloop_ud)
-            GC.gc()
-        end
-    end
-    return oneloop_neft_sa, oneloop_neft_ud
 end

@@ -19,6 +19,7 @@ using MCIntegration
 using MPI
 using ProgressMeter
 using Parameters
+using Printf
 using Test
 
 import FeynmanDiagram.FrontEnds: TwoBodyChannel, Alli, PHr, PHEr, PPr, AnyChan
@@ -30,6 +31,22 @@ import FeynmanDiagram.FrontEnds: AnalyticProperty, Instant, Dynamic
 const MAXIMUM_STEPS = 100
 const PROJECT_ROOT = pkgdir(LQSGW)
 const DATA_DIR = joinpath(PROJECT_ROOT, "data")
+
+const alpha_ueg = (4 / 9π)^(1 / 3)
+export alpha_ueg
+
+@enum OneLoopGraphType begin
+    # One-loop diagram types
+    vertex = 1
+    direct_crossed_box = 2
+    direct_uncrossed_box = 3
+    exchange_crossed_box = 4
+    exchange_uncrossed_box = 5
+end
+export OneLoopGraphType
+
+const boxtypes =
+    (direct_crossed_box, direct_uncrossed_box, exchange_crossed_box, exchange_uncrossed_box)
 
 include("one_loop_parameters.jl")
 export OneLoopParams,
@@ -62,15 +79,11 @@ export initialize_one_loop_params!,
     get_one_loop_graphs
 export one_loop_box_diagram, one_loop_box_contribution, one_loop_vertex_contribution
 
-const alpha_ueg = (4 / 9π)^(1 / 3)
-export alpha_ueg
-
-const boxtypes = [
-    (true, true),    # direct crossed
-    (true, false),   # direct uncrossed
-    (false, true),   # exchange crossed
-    (false, false),  # exchange uncrossed
-]
+include("one_loop_mcmc.jl")
+export one_loop_mcmc_neft, get_yukawa_one_loop_neft
+export get_one_loop_graphs, get_individual_one_loop_graphs, get_vertex_graph
+export get_direct_crossed_box_graph, get_direct_uncrossed_box_graph
+export get_exchange_crossed_graph, get_exchange_uncrossed_graph
 
 struct OneLoopBoxDiagrams{T}
     F2b_direct_crossed::Tuple{T,T}
