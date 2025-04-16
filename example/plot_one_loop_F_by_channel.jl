@@ -71,13 +71,26 @@ rcParams["font.size"] = 16
 rcParams["mathtext.fontset"] = "cm"
 rcParams["font.family"] = "Times New Roman"
 
+function ex_to_di_sa(Wse, Wae)
+    Ws = (Wse + 3 * Wae) / 2
+    Wa = (Wse - Wae) / 2
+    return Ws, Wa
+end
+
+function ex_to_di_ud(Wuue, Wude)
+    Wuu = -Wuue
+    Wud = Wude - Wuue
+    return Wuu, Wud
+end
+
 function plot_F_by_channel(isDynamic=false, z_renorm=false)
     # NOTE: NEFT tree-level data is missing an overall minus sign (change sign convention for F).
     #       However, we now use the exact expressions for F1 and F2ct to isolate the problem with F2d.
     neft_factor_tree_level = 1.0
     neft_factor_one_loop = 1.0
 
-    leg_convention = :PH
+    # leg_convention = :PH
+    leg_convention = :PP
     neft_splines = false
 
     function plotdata(x, y, e; error_multiplier=1.0)
@@ -94,53 +107,107 @@ function plot_F_by_channel(isDynamic=false, z_renorm=false)
     # Load PHr NEFT benchmark data using jld2
     @load "one_loop_F_phr_neft_$(leg_convention).jld2" rslist oneloop_sa_phr_neft oneloop_ud_phr_neft
     rslist_big = rslist
-    function loaddata_oneloop_phr_neft(property::Symbol, representation="sa", factor=1.0)
+    function loaddata_oneloop_phr_neft(
+        property::Symbol,
+        representation="sa",
+        factor=1.0,
+        ex_to_di=true,
+    )
         @assert representation in ["sa", "ud"]
-        data = representation == "sa" ? oneloop_sa_phr_neft : oneloop_ud_phr_neft
+        # data = representation == "sa" ? oneloop_sa_phr_neft : oneloop_ud_phr_neft
+        data = oneloop_ud_phr_neft
         res = [factor .* x for x in getproperty.(data, property)]
-        res_s, res_a = first.(res), last.(res)
-        return res_s, res_a
+        # res_s, res_a = first.(res), last.(res)
+        res_uu, res_ud = first.(res), last.(res)
+        if ex_to_di
+            # exchange_to_direct = representation == "sa" ? ex_to_di_sa : ex_to_di_ud
+            # return exchange_to_direct(res_s, res_a)
+            res_uu, res_ud = ex_to_di_ud(res_uu, res_ud)
+        end
+        if representation == "sa"
+            res_s, res_a = Ver4.ud2sa(res_uu, res_ud)
+            return res_s, res_a
+        end
+        return res_uu, res_ud
     end
 
     # Fs = (F↑↑ + F↑↓) / 2, Fa = (F↑↑ - F↑↓) / 2
-    Fs2ds_phr_neft, Fa2ds_phr_neft = loaddata_oneloop_phr_neft(:F2d, "sa", neft_factor_one_loop)
+    Fs2ds_phr_neft, Fa2ds_phr_neft =
+        loaddata_oneloop_phr_neft(:F2d, "sa", neft_factor_one_loop)
 
     # F↑↑ = Fs + Fa, F↑↓ = Fs - Fa
-    Fuu2ds_phr_neft, Fud2ds_phr_neft = loaddata_oneloop_phr_neft(:F2d, "ud", neft_factor_one_loop)
-    
+    Fuu2ds_phr_neft, Fud2ds_phr_neft =
+        loaddata_oneloop_phr_neft(:F2d, "ud", neft_factor_one_loop)
+
     # Load PHEr NEFT benchmark data using jld2
     @load "one_loop_F_pher_neft_$(leg_convention).jld2" rslist oneloop_sa_pher_neft oneloop_ud_pher_neft
     rslist_big = rslist
-    function loaddata_oneloop_pher_neft(property::Symbol, representation="sa", factor=1.0)
+    function loaddata_oneloop_pher_neft(
+        property::Symbol,
+        representation="sa",
+        factor=1.0,
+        ex_to_di=true,
+    )
         @assert representation in ["sa", "ud"]
-        data = representation == "sa" ? oneloop_sa_pher_neft : oneloop_ud_pher_neft
+        # data = representation == "sa" ? oneloop_sa_pher_neft : oneloop_ud_pher_neft
+        data = oneloop_ud_pher_neft
         res = [factor .* x for x in getproperty.(data, property)]
-        res_s, res_a = first.(res), last.(res)
-        return res_s, res_a
+        # res_s, res_a = first.(res), last.(res)
+        res_uu, res_ud = first.(res), last.(res)
+        if ex_to_di
+            # exchange_to_direct = representation == "sa" ? ex_to_di_sa : ex_to_di_ud
+            # return exchange_to_direct(res_s, res_a)
+            res_uu, res_ud = ex_to_di_ud(res_uu, res_ud)
+        end
+        if representation == "sa"
+            res_s, res_a = Ver4.ud2sa(res_uu, res_ud)
+            return res_s, res_a
+        end
+        return res_uu, res_ud
     end
 
     # Fs = (F↑↑ + F↑↓) / 2, Fa = (F↑↑ - F↑↓) / 2
-    Fs2ds_pher_neft, Fa2ds_pher_neft = loaddata_oneloop_pher_neft(:F2d, "sa", neft_factor_one_loop)
+    Fs2ds_pher_neft, Fa2ds_pher_neft =
+        loaddata_oneloop_pher_neft(:F2d, "sa", neft_factor_one_loop)
 
     # F↑↑ = Fs + Fa, F↑↓ = Fs - Fa
-    Fuu2ds_pher_neft, Fud2ds_pher_neft = loaddata_oneloop_pher_neft(:F2d, "ud", neft_factor_one_loop)
-    
+    Fuu2ds_pher_neft, Fud2ds_pher_neft =
+        loaddata_oneloop_pher_neft(:F2d, "ud", neft_factor_one_loop)
+
     # Load PPr NEFT benchmark data using jld2
     @load "one_loop_F_ppr_neft_$(leg_convention).jld2" rslist oneloop_sa_ppr_neft oneloop_ud_ppr_neft
     rslist_big = rslist
-    function loaddata_oneloop_ppr_neft(property::Symbol, representation="sa", factor=1.0)
+    function loaddata_oneloop_ppr_neft(
+        property::Symbol,
+        representation="sa",
+        factor=1.0,
+        ex_to_di=true,
+    )
         @assert representation in ["sa", "ud"]
-        data = representation == "sa" ? oneloop_sa_ppr_neft : oneloop_ud_ppr_neft
+        # data = representation == "sa" ? oneloop_sa_ppr_neft : oneloop_ud_ppr_neft
+        data = oneloop_ud_ppr_neft
         res = [factor .* x for x in getproperty.(data, property)]
-        res_s, res_a = first.(res), last.(res)
-        return res_s, res_a
+        # res_s, res_a = first.(res), last.(res)
+        res_uu, res_ud = first.(res), last.(res)
+        if ex_to_di
+            # exchange_to_direct = representation == "sa" ? ex_to_di_sa : ex_to_di_ud
+            # return exchange_to_direct(res_s, res_a)
+            res_uu, res_ud = ex_to_di_ud(res_uu, res_ud)
+        end
+        if representation == "sa"
+            res_s, res_a =  Ver4.ud2sa(res_uu, res_ud)
+            return res_s, res_a
+        end
+        return res_uu, res_ud
     end
 
     # Fs = (F↑↑ + F↑↓) / 2, Fa = (F↑↑ - F↑↓) / 2
-    Fs2ds_ppr_neft, Fa2ds_ppr_neft = loaddata_oneloop_ppr_neft(:F2d, "sa", neft_factor_one_loop)
+    Fs2ds_ppr_neft, Fa2ds_ppr_neft =
+        loaddata_oneloop_ppr_neft(:F2d, "sa", neft_factor_one_loop)
 
     # F↑↑ = Fs + Fa, F↑↓ = Fs - Fa
-    Fuu2ds_ppr_neft, Fud2ds_ppr_neft = loaddata_oneloop_ppr_neft(:F2d, "ud", neft_factor_one_loop)
+    Fuu2ds_ppr_neft, Fud2ds_ppr_neft =
+        loaddata_oneloop_ppr_neft(:F2d, "ud", neft_factor_one_loop)
 
     # Load our data using jld2
     @load "one_loop_F_ours.jld2" rslist oneloop_sa_ours oneloop_ud_ours
@@ -200,6 +267,52 @@ function plot_F_by_channel(isDynamic=false, z_renorm=false)
     Fa2ds_ppr_ours = Fa2bs_DU_ours + Fa2bs_EU_ours
     Fuu2ds_ppr_ours = Fuu2bs_DU_ours + Fuu2bs_EU_ours
     Fud2ds_ppr_ours = Fud2bs_DU_ours + Fud2bs_EU_ours
+
+    ####################################################
+    ### Compare NEFT/our results for F2↑↑ by channel ###
+    ####################################################
+
+    fig, ax = plt.subplots(; figsize=(5, 5))
+    # Our data
+    ax.plot(
+        spline(rslist_small, Fuu2ds_phr_ours)...;
+        color=cdict["orange"],
+        label="\$\\uparrow\\uparrow\$",
+    )
+    ax.plot(
+        spline(rslist_small, Fud2ds_phr_ours)...;
+        color=cdict["magenta"],
+        label="\$\\uparrow\\downarrow\$",
+    )
+    # NEFT data
+    mean_uu = Measurements.value.(Fuu2ds_phr_neft)
+    stddev = Measurements.uncertainty.(Fuu2ds_phr_neft)
+    ax.plot(
+        plotdata(rslist_big, mean_uu, stddev)...;
+        color=cdict["blue"],
+        linestyle="--",
+        label="\$\\uparrow\\uparrow\$ (NEFT)",
+    )
+    ax.scatter(rslist_big, mean_uu; color=cdict["blue"], s=4)
+
+    mean_ud = Measurements.value.(Fud2ds_phr_neft)
+    stddev = Measurements.uncertainty.(Fud2ds_phr_neft)
+    ax.plot(
+        plotdata(rslist_big, mean_ud, stddev)...;
+        color=cdict["cyan"],
+        linestyle="--",
+        label="\$\\uparrow\\downarrow\$ (NEFT)",
+    )
+    ax.scatter(rslist_big, mean_ud; color=cdict["cyan"], s=4)
+    ax.set_xlabel("\$r_s\$")
+    ax.set_ylabel("\$F^{\\sigma_1 \\sigma_2}_{2} \\xi^2\$")
+    if isDynamic == false
+        # ax.set_ylim(-0.9, 0.9)
+    end
+    ax.set_xlim(0, 10)
+    ax.legend(; ncol=2, fontsize=12, loc="best", columnspacing=0.5)
+    plt.tight_layout()
+    fig.savefig("test.pdf")
 
     ####################################################
     ### Compare NEFT/our results for F2↑↑ by channel ###

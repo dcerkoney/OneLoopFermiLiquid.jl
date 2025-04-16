@@ -50,13 +50,14 @@ function main()
     verbose = true
     z_renorm = false
     show_progress = true
-    leg_convention = :PH  # or :PP — just an external leg convention, shouldn't affect the final result
+    leg_convention = :PP  # or :PP — just an external leg convention, shouldn't affect the final result
+    # leg_convention = :PH  # or :PP — just an external leg convention, shouldn't affect the final result
 
-    neval = 1e8
+    neval = 1e7
     # neval = 4e8  # final results
 
     run_channels = [
-        # PHr,
+        PHr,
         PHEr,
         PPr,
         # AnyChan,
