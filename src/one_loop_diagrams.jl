@@ -147,8 +147,8 @@ function one_loop_box_contribution(param::OneLoopParams; show_progress=false)
         q = qgrid.grid[qi]
         for (iθ, θ) in enumerate(θgrid)
             for (iφ, φ) in enumerate(φgrid)
-                φs_integrand[iφ] = box_matsubara_sum(param, q, θ, φ, "Fs")
-                φa_integrand[iφ] = box_matsubara_sum(param, q, θ, φ, "Fa")
+                φs_integrand[iφ] = total_box_matsubara_sum(param, q, θ, φ, "Fs")
+                φa_integrand[iφ] = total_box_matsubara_sum(param, q, θ, φ, "Fa")
             end
             θs_integrand[iθ] = Interp.integrate1D(φs_integrand, φgrid)
             θa_integrand[iθ] = Interp.integrate1D(φa_integrand, φgrid)

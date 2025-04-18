@@ -62,8 +62,8 @@ function main()
     rtol = 1e-7
 
     # Calculate the one-loop results for Fs and Fa, F↑↑ and F↑↓ of each box diagram type
-    boxdiags_sa = []
-    boxdiags_ud = []
+    boxdiags_sa_ours = []
+    boxdiags_ud_ours = []
     for (i, rs) in enumerate(rslist)
         if debug && rank == root
             testdlr(rs, euv, rtol; verbose=verbose)
@@ -101,14 +101,14 @@ function main()
             verbose=verbose,
             show_progress=show_progress,
         )
-        push!(boxdiags_sa, boxdiags_sa_this_rs)
-        push!(boxdiags_ud, boxdiags_ud_this_rs)
+        push!(boxdiags_sa_ours, boxdiags_sa_this_rs)
+        push!(boxdiags_ud_ours, boxdiags_ud_this_rs)
         GC.gc()
     end
     # Save our results to np file
     if save && rank == root
-        @assert isempty(boxdiags_sa) == isempty(boxdiags_ud) == false
-        @save "one_loop_box_diagrams.jld2" rslist boxdiags_sa boxdiags_ud
+        @assert isempty(boxdiags_sa_ours) == isempty(boxdiags_ud_ours) == false
+        @save "one_loop_box_diagrams_ours.jld2" rslist boxdiags_sa_ours boxdiags_ud_ours
     end
     MPI.Finalize()
     return

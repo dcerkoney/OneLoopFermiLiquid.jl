@@ -50,23 +50,26 @@ function main()
     verbose = true
     z_renorm = false
     show_progress = true
-    leg_convention = :PP  # or :PP — just an external leg convention, shouldn't affect the final result
-    # leg_convention = :PH  # or :PP — just an external leg convention, shouldn't affect the final result
+    leg_convention = :PH  # or :PP — just an external leg ordering convention, doesn't affect the final result
 
     neval = 1e7
     # neval = 4e8  # final results
 
-    run_channels = [
-        PHr,
-        PHEr,
-        PPr,
-        # AnyChan,
-    ]
+    run_channels = [PHr, PHEr, PPr, AnyChan]
     run_neft = true
     run_ours = false
 
-    # Yukawa interaction
-    isDynamic = false
+    # # Yukawa interaction
+    # isDynamic = false
+
+    # RPA
+    isDynamic = true
+
+    if isDynamic
+        rpastr = "_rpa"
+    else
+        rpastr = ""
+    end
 
     # Fs = f^{Di} + f^{Ex} / 2
     # Fa = f^{Ex} / 2
@@ -83,8 +86,9 @@ function main()
 
     # Calculate the one-loop results for F↑↑ and F↑↓ using NEFT and/or our code
     if run_neft
+        run_neft = isDynamic ? get_rpa_one_loop_neft : get_yukawa_one_loop_neft
         if PHr in run_channels
-            oneloop_sa_phr_neft, oneloop_ud_phr_neft = get_yukawa_one_loop_neft(
+            oneloop_sa_phr_neft, oneloop_ud_phr_neft = run_neft(
                 rslist,
                 beta;
                 neval=neval,
@@ -96,11 +100,11 @@ function main()
                 @assert isempty(oneloop_sa_phr_neft) ==
                         isempty(oneloop_ud_phr_neft) ==
                         false
-                @save "one_loop_F_phr_neft_$(leg_convention).jld2" rslist oneloop_sa_phr_neft oneloop_ud_phr_neft
+                @save "one_loop_F$(rpastr)_phr_neft_$(leg_convention).jld2" rslist oneloop_sa_phr_neft oneloop_ud_phr_neft
             end
         end
         if PHEr in run_channels
-            oneloop_sa_pher_neft, oneloop_ud_pher_neft = get_yukawa_one_loop_neft(
+            oneloop_sa_pher_neft, oneloop_ud_pher_neft = run_neft(
                 rslist,
                 beta;
                 neval=neval,
@@ -112,11 +116,11 @@ function main()
                 @assert isempty(oneloop_sa_pher_neft) ==
                         isempty(oneloop_ud_pher_neft) ==
                         false
-                @save "one_loop_F_pher_neft_$(leg_convention).jld2" rslist oneloop_sa_pher_neft oneloop_ud_pher_neft
+                @save "one_loop_F$(rpastr)_pher_neft_$(leg_convention).jld2" rslist oneloop_sa_pher_neft oneloop_ud_pher_neft
             end
         end
         if PPr in run_channels
-            oneloop_sa_ppr_neft, oneloop_ud_ppr_neft = get_yukawa_one_loop_neft(
+            oneloop_sa_ppr_neft, oneloop_ud_ppr_neft = run_neft(
                 rslist,
                 beta;
                 neval=neval,
@@ -128,11 +132,11 @@ function main()
                 @assert isempty(oneloop_sa_ppr_neft) ==
                         isempty(oneloop_ud_ppr_neft) ==
                         false
-                @save "one_loop_F_ppr_neft_$(leg_convention).jld2" rslist oneloop_sa_ppr_neft oneloop_ud_ppr_neft
+                @save "one_loop_F$(rpastr)_ppr_neft_$(leg_convention).jld2" rslist oneloop_sa_ppr_neft oneloop_ud_ppr_neft
             end
         end
         if AnyChan in run_channels
-            oneloop_sa_neft, oneloop_ud_neft = get_yukawa_one_loop_neft(
+            oneloop_sa_neft, oneloop_ud_neft = run_neft(
                 rslist,
                 beta;
                 neval=neval,
@@ -142,7 +146,7 @@ function main()
             # Save full NEFT result to np file
             if save && rank == root
                 @assert isempty(oneloop_sa_neft) == isempty(oneloop_ud_neft) == false
-                @save "one_loop_F_neft_$(leg_convention).jld2" rslist oneloop_sa_neft oneloop_ud_neft
+                @save "one_loop_F$(rpastr)_neft_$(leg_convention).jld2" rslist oneloop_sa_neft oneloop_ud_neft
             end
         end
     end
@@ -194,7 +198,7 @@ function main()
         # Save our results to np files
         if save && rank == root
             @assert isempty(oneloop_sa_ours) == isempty(oneloop_ud_ours) == false
-            @save "one_loop_F_ours.jld2" rslist oneloop_sa_ours oneloop_ud_ours
+            @save "one_loop_F_ours_new.jld2" rslist oneloop_sa_ours oneloop_ud_ours
         end
     end
     MPI.Finalize()

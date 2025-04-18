@@ -89,8 +89,8 @@ function plot_F_by_channel(isDynamic=false, z_renorm=false)
     neft_factor_tree_level = 1.0
     neft_factor_one_loop = 1.0
 
-    # leg_convention = :PH
-    leg_convention = :PP
+    leg_convention = :PH
+    # leg_convention = :PP
     neft_splines = false
 
     function plotdata(x, y, e; error_multiplier=1.0)
@@ -111,7 +111,7 @@ function plot_F_by_channel(isDynamic=false, z_renorm=false)
         property::Symbol,
         representation="sa",
         factor=1.0,
-        ex_to_di=true,
+        ex_to_di=false,
     )
         @assert representation in ["sa", "ud"]
         # data = representation == "sa" ? oneloop_sa_phr_neft : oneloop_ud_phr_neft
@@ -146,7 +146,7 @@ function plot_F_by_channel(isDynamic=false, z_renorm=false)
         property::Symbol,
         representation="sa",
         factor=1.0,
-        ex_to_di=true,
+        ex_to_di=false,
     )
         @assert representation in ["sa", "ud"]
         # data = representation == "sa" ? oneloop_sa_pher_neft : oneloop_ud_pher_neft
@@ -181,7 +181,7 @@ function plot_F_by_channel(isDynamic=false, z_renorm=false)
         property::Symbol,
         representation="sa",
         factor=1.0,
-        ex_to_di=true,
+        ex_to_di=false,
     )
         @assert representation in ["sa", "ud"]
         # data = representation == "sa" ? oneloop_sa_ppr_neft : oneloop_ud_ppr_neft
@@ -195,7 +195,7 @@ function plot_F_by_channel(isDynamic=false, z_renorm=false)
             res_uu, res_ud = ex_to_di_ud(res_uu, res_ud)
         end
         if representation == "sa"
-            res_s, res_a =  Ver4.ud2sa(res_uu, res_ud)
+            res_s, res_a = Ver4.ud2sa(res_uu, res_ud)
             return res_s, res_a
         end
         return res_uu, res_ud
@@ -208,6 +208,41 @@ function plot_F_by_channel(isDynamic=false, z_renorm=false)
     # F↑↑ = Fs + Fa, F↑↓ = Fs - Fa
     Fuu2ds_ppr_neft, Fud2ds_ppr_neft =
         loaddata_oneloop_ppr_neft(:F2d, "ud", neft_factor_one_loop)
+
+    # Load AnyChan NEFT benchmark data using jld2
+    @load "one_loop_F_neft_$(leg_convention).jld2" rslist oneloop_sa_neft oneloop_ud_neft
+    rslist_big = rslist
+    function loaddata_oneloop_anychan_neft(
+        property::Symbol,
+        representation="sa",
+        factor=1.0,
+        ex_to_di=false,
+    )
+        @assert representation in ["sa", "ud"]
+        # data = representation == "sa" ? oneloop_sa_neft : oneloop_ud_neft
+        data = oneloop_ud_neft
+        res = [factor .* x for x in getproperty.(data, property)]
+        # res_s, res_a = first.(res), last.(res)
+        res_uu, res_ud = first.(res), last.(res)
+        if ex_to_di
+            # exchange_to_direct = representation == "sa" ? ex_to_di_sa : ex_to_di_ud
+            # return exchange_to_direct(res_s, res_a)
+            res_uu, res_ud = ex_to_di_ud(res_uu, res_ud)
+        end
+        if representation == "sa"
+            res_s, res_a = Ver4.ud2sa(res_uu, res_ud)
+            return res_s, res_a
+        end
+        return res_uu, res_ud
+    end
+
+    # Fs = (F↑↑ + F↑↓) / 2, Fa = (F↑↑ - F↑↓) / 2
+    Fs2ds_neft, Fa2ds_neft =
+        loaddata_oneloop_anychan_neft(:F2d, "sa", neft_factor_one_loop)
+
+    # F↑↑ = Fs + Fa, F↑↓ = Fs - Fa
+    Fuu2ds_neft, Fud2ds_neft =
+        loaddata_oneloop_anychan_neft(:F2d, "ud", neft_factor_one_loop)
 
     # Load our data using jld2
     @load "one_loop_F_ours.jld2" rslist oneloop_sa_ours oneloop_ud_ours
@@ -223,18 +258,20 @@ function plot_F_by_channel(isDynamic=false, z_renorm=false)
     # Fs = (F↑↑ + F↑↓) / 2, Fa = (F↑↑ - F↑↓) / 2
     Fs1s_ours, Fa1s_ours = loaddata_oneloop_ours(:F1, "sa")
     Fs2vs_ours, Fa2vs_ours = loaddata_oneloop_ours(:F2v, "sa")
+    Fs2ds_ours, Fa2ds_ours = loaddata_oneloop_ours(:F2d, "sa")
     Fs2cts_ours, Fa2cts_ours = loaddata_oneloop_ours(:F2ct, "sa")
 
     # F↑↑ = Fs + Fa, F↑↓ = Fs - Fa
     Fuu1s_ours, Fud1s_ours = loaddata_oneloop_ours(:F1, "ud")
     Fuu2vs_ours, Fud2vs_ours = loaddata_oneloop_ours(:F2v, "ud")
+    Fuu2ds_ours, Fud2ds_ours = loaddata_oneloop_ours(:F2d, "ud")
     Fuu2cts_ours, Fud2cts_ours = loaddata_oneloop_ours(:F2ct, "ud")
 
     # Load our data for the four individual box diagram contributions
-    @load "one_loop_box_diagrams_ours.jld2" rslist boxdiags_sa_ours boxdiags_ud_ours
+    @load "one_loop_box_diagrams_ours.jld2" rslist boxdiags_sa boxdiags_ud
     function loaddata_boxdiags_ours(property::Symbol, representation="sa", factor=1.0)
         @assert representation in ["sa", "ud"]
-        data = representation == "sa" ? boxdiags_sa_ours : boxdiags_ud_ours
+        data = representation == "sa" ? boxdiags_sa : boxdiags_ud
         res = [factor .* x for x in getproperty.(data, property)]
         res_s, res_a = first.(res), last.(res)
         return res_s, res_a
@@ -252,67 +289,97 @@ function plot_F_by_channel(isDynamic=false, z_renorm=false)
     Fuu2bs_EC_ours, Fud2bs_EC_ours = loaddata_boxdiags_ours(:F2b_exchange_crossed, "ud")
     Fuu2bs_EU_ours, Fud2bs_EU_ours = loaddata_boxdiags_ours(:F2b_exchange_uncrossed, "ud")
 
-    # F2d_PHr = F2_b_DC
-    Fs2ds_phr_ours, Fa2ds_phr_ours = Fs2bs_DC_ours, Fa2bs_DC_ours
-    Fuu2ds_phr_ours, Fud2ds_phr_ours = Fuu2bs_DC_ours, Fud2bs_DC_ours
+    # F2d_PHr = F2_b_EC
+    Fs2ds_phr_ours, Fa2ds_phr_ours = Fs2bs_EC_ours, Fa2bs_EC_ours
+    Fuu2ds_phr_ours, Fud2ds_phr_ours = Fuu2bs_EC_ours, Fud2bs_EC_ours
 
-    # F2d_PHEr = F2_v + F2_b_EC
-    Fs2ds_pher_ours = Fs2vs_ours + Fs2bs_EC_ours
-    Fa2ds_pher_ours = Fa2vs_ours + Fa2bs_EC_ours
-    Fuu2ds_pher_ours = Fuu2vs_ours + Fuu2bs_EC_ours
-    Fud2ds_pher_ours = Fud2vs_ours + Fud2bs_EC_ours
+    # F2d_PHEr = F2_v + F2_b_DC (exchange bubble cancelled exactly in CTs)
+    Fs2ds_pher_ours = Fs2vs_ours + Fs2bs_DC_ours
+    Fa2ds_pher_ours = Fa2vs_ours + Fa2bs_DC_ours
+    Fuu2ds_pher_ours = Fuu2vs_ours + Fuu2bs_DC_ours
+    Fud2ds_pher_ours = Fud2vs_ours + Fud2bs_DC_ours
 
     # F2d_PPr = F2_b_DU + F2_b_EU
     Fs2ds_ppr_ours = Fs2bs_DU_ours + Fs2bs_EU_ours
     Fa2ds_ppr_ours = Fa2bs_DU_ours + Fa2bs_EU_ours
     Fuu2ds_ppr_ours = Fuu2bs_DU_ours + Fuu2bs_EU_ours
     Fud2ds_ppr_ours = Fud2bs_DU_ours + Fud2bs_EU_ours
+    
+    # # F2d_PHr = F2_b_DC
+    # Fs2ds_phr_ours, Fa2ds_phr_ours = Fs2bs_DC_ours, Fa2bs_DC_ours
+    # Fuu2ds_phr_ours, Fud2ds_phr_ours = Fuu2bs_DC_ours, Fud2bs_DC_ours
 
-    ####################################################
-    ### Compare NEFT/our results for F2↑↑ by channel ###
-    ####################################################
+    # # F2d_PHEr = F2_v + F2_b_EC
+    # Fs2ds_pher_ours = Fs2vs_ours + Fs2bs_EC_ours
+    # Fa2ds_pher_ours = Fa2vs_ours + Fa2bs_EC_ours
+    # Fuu2ds_pher_ours = Fuu2vs_ours + Fuu2bs_EC_ours
+    # Fud2ds_pher_ours = Fud2vs_ours + Fud2bs_EC_ours
 
-    fig, ax = plt.subplots(; figsize=(5, 5))
-    # Our data
-    ax.plot(
-        spline(rslist_small, Fuu2ds_phr_ours)...;
-        color=cdict["orange"],
-        label="\$\\uparrow\\uparrow\$",
-    )
-    ax.plot(
-        spline(rslist_small, Fud2ds_phr_ours)...;
-        color=cdict["magenta"],
-        label="\$\\uparrow\\downarrow\$",
-    )
-    # NEFT data
-    mean_uu = Measurements.value.(Fuu2ds_phr_neft)
-    stddev = Measurements.uncertainty.(Fuu2ds_phr_neft)
-    ax.plot(
-        plotdata(rslist_big, mean_uu, stddev)...;
-        color=cdict["blue"],
-        linestyle="--",
-        label="\$\\uparrow\\uparrow\$ (NEFT)",
-    )
-    ax.scatter(rslist_big, mean_uu; color=cdict["blue"], s=4)
+    # # F2d_PPr = F2_b_DU + F2_b_EU
+    # Fs2ds_ppr_ours = Fs2bs_DU_ours + Fs2bs_EU_ours
+    # Fa2ds_ppr_ours = Fa2bs_DU_ours + Fa2bs_EU_ours
+    # Fuu2ds_ppr_ours = Fuu2bs_DU_ours + Fuu2bs_EU_ours
+    # Fud2ds_ppr_ours = Fud2bs_DU_ours + Fud2bs_EU_ours
 
-    mean_ud = Measurements.value.(Fud2ds_phr_neft)
-    stddev = Measurements.uncertainty.(Fud2ds_phr_neft)
-    ax.plot(
-        plotdata(rslist_big, mean_ud, stddev)...;
-        color=cdict["cyan"],
-        linestyle="--",
-        label="\$\\uparrow\\downarrow\$ (NEFT)",
-    )
-    ax.scatter(rslist_big, mean_ud; color=cdict["cyan"], s=4)
-    ax.set_xlabel("\$r_s\$")
-    ax.set_ylabel("\$F^{\\sigma_1 \\sigma_2}_{2} \\xi^2\$")
-    if isDynamic == false
-        # ax.set_ylim(-0.9, 0.9)
-    end
-    ax.set_xlim(0, 10)
-    ax.legend(; ncol=2, fontsize=12, loc="best", columnspacing=0.5)
-    plt.tight_layout()
-    fig.savefig("test.pdf")
+    # ####################################################
+    # ### Compare NEFT/our results for F2↑↑ by channel ###
+    # ####################################################
+
+    # # @load "F2_DC_theta12=piover2.jld2" F2_DC_θ12
+
+    # fig, ax = plt.subplots(; figsize=(5, 5))
+    # # Our data
+    # ax.plot(
+    #     spline(rslist_small, Fuu2ds_phr_ours)...;
+    #     color=cdict["orange"],
+    #     label="\$\\uparrow\\uparrow\$",
+    # )
+    # ax.plot(
+    #     spline(rslist_small, Fud2ds_phr_ours)...;
+    #     color=cdict["magenta"],
+    #     label="\$\\uparrow\\downarrow\$",
+    # )
+    # # NEFT data
+    # # Fuu2ds_phr_neft *= 4.0
+    # mean_uu = Measurements.value.(Fuu2ds_phr_neft)
+    # stddev = Measurements.uncertainty.(Fuu2ds_phr_neft)
+    # ax.plot(
+    #     plotdata(rslist_big, mean_uu, stddev)...;
+    #     color=cdict["blue"],
+    #     linestyle="--",
+    #     label="\$\\uparrow\\uparrow\$ (NEFT)",
+    # )
+    # ax.scatter(rslist_big, mean_uu; color=cdict["blue"], s=4)
+    # mean_ud = Measurements.value.(Fud2ds_phr_neft)
+    # stddev = Measurements.uncertainty.(Fud2ds_phr_neft)
+    # ax.plot(
+    #     plotdata(rslist_big, mean_ud, stddev)...;
+    #     color=cdict["cyan"],
+    #     linestyle="--",
+    #     label="\$\\uparrow\\downarrow\$ (NEFT)",
+    # )
+    # ax.scatter(rslist_big, mean_ud; color=cdict["cyan"], s=4)
+    # # # 2D VEGAS (numerically exact result)
+    # # mean_vegas = Measurements.value.(F2_DC_θ12)
+    # # stddev_vegas = Measurements.uncertainty.(F2_DC_θ12)
+    # # ax.plot(
+    # #     plotdata(rslist_big, mean_vegas, stddev_vegas)...;
+    # #     color=cdict["black"],
+    # #     linestyle="-",
+    # #     label="(2D VEGAS)",
+    # # )
+    # # ax.scatter(rslist_big, mean_vegas; color=cdict["black"], s=4)
+    # ax.set_xlabel("\$r_s\$")
+    # ax.set_ylabel("\$F^{\\sigma_1 \\sigma_2}_{2} \\xi^2\$")
+    # if isDynamic == false
+    #     # ax.set_ylim(-0.9, 0.9)
+    # end
+    # ax.set_xlim(0, 10)
+    # ax.legend(; ncol=2, fontsize=10, loc="best", columnspacing=0.5)
+    # plt.tight_layout()
+    # fig.savefig("test_$(leg_convention).pdf")
+
+    # return
 
     ####################################################
     ### Compare NEFT/our results for F2↑↑ by channel ###
@@ -326,7 +393,7 @@ function plot_F_by_channel(isDynamic=false, z_renorm=false)
         plotdata(rslist_big, mean, stddev)...;
         color=cdict["blue"],
         linestyle="--",
-        label="\$\\text{PHr}\$ (NEFT)",
+        label="\$F^{\\uparrow\\uparrow}_{2,\\text{PHr}}\$ (NEFT)",
     )
     ax.scatter(rslist_big, mean; color=cdict["blue"], s=4)
     mean = Measurements.value.(Fuu2ds_pher_neft)
@@ -335,7 +402,7 @@ function plot_F_by_channel(isDynamic=false, z_renorm=false)
         plotdata(rslist_big, mean, stddev)...;
         color=cdict["cyan"],
         linestyle="--",
-        label="\$\\text{PHEr}\$ (NEFT)",
+        label="\$F^{\\uparrow\\uparrow}_{2,\\text{PHEr}}\$ (NEFT)",
     )
     ax.scatter(rslist_big, mean; color=cdict["cyan"], s=4)
     mean = Measurements.value.(Fuu2ds_ppr_neft)
@@ -344,32 +411,47 @@ function plot_F_by_channel(isDynamic=false, z_renorm=false)
         plotdata(rslist_big, mean, stddev)...;
         color=cdict["teal"],
         linestyle="--",
-        label="\$\\text{PPr}\$ (NEFT)",
+        label="\$F^{\\uparrow\\uparrow}_{2,\\text{PPr}}\$ (NEFT)",
     )
     ax.scatter(rslist_big, mean; color=cdict["teal"], s=4)
+    mean = Measurements.value.(Fuu2ds_neft)
+    stddev = Measurements.uncertainty.(Fuu2ds_neft)
+    ax.plot(
+        plotdata(rslist_big, mean, stddev)...;
+        color=cdict["grey"],
+        linestyle="--",
+        label="\$F^{\\uparrow\\uparrow}_{2}\$ (NEFT)",
+    )
+    ax.scatter(rslist_big, mean; color=cdict["grey"], s=4)
     # Our data
     ax.plot(
         spline(rslist_small, Fuu2ds_phr_ours)...;
         color=cdict["orange"],
-        label="\$\\text{PHr}\$",
+        label="\$F^{\\uparrow\\uparrow}_{2,\\text{PHr}}(\\theta_{12} = \\frac{\\pi}{2})\$",
     )
     ax.plot(
         spline(rslist_small, Fuu2ds_pher_ours)...;
         color=cdict["magenta"],
-        label="\$\\text{PHEr}\$",
+        label="\$F^{\\uparrow\\uparrow}_{2,\\text{PHEr}}(\\theta_{12} = \\frac{\\pi}{2})\$",
     )
     ax.plot(
         spline(rslist_small, Fuu2ds_ppr_ours)...;
         color=cdict["red"],
-        label="\$\\text{PPr}\$",
+        label="\$F^{\\uparrow\\uparrow}_{2,\\text{PPr}}(\\theta_{12} = \\frac{\\pi}{2})\$",
+    )
+    ax.plot(
+        spline(rslist_small, Fuu2ds_ours)...;
+        color=cdict["black"],
+        label="\$F^{\\uparrow\\uparrow}_{2}(\\theta_{12} = \\frac{\\pi}{2})\$",
     )
     ax.set_xlabel("\$r_s\$")
-    ax.set_ylabel("\$F^{\\uparrow\\uparrow}_{2} \\xi^2\$")
+    # ax.set_ylabel("\$F^{\\uparrow\\uparrow}_{2} \\xi^2\$")
     if isDynamic == false
         # ax.set_ylim(-0.9, 0.9)
     end
     ax.set_xlim(0, 10)
-    ax.legend(; ncol=2, fontsize=12, loc="upper left", columnspacing=0.5)
+    ax.set_ylim(nothing, 0.76)
+    ax.legend(; ncol=2, fontsize=10, loc="upper left", columnspacing=0.5)
     plt.tight_layout()
     fig.savefig("oneloop_F2_uu_channels_vs_rs$(interactionstr)_$(leg_convention).pdf")
 
@@ -385,7 +467,7 @@ function plot_F_by_channel(isDynamic=false, z_renorm=false)
         plotdata(rslist_big, mean, stddev)...;
         color=cdict["blue"],
         linestyle="--",
-        label="\$\\text{PHr}\$ (NEFT)",
+        label="\$F^{\\uparrow\\downarrow}_{2,\\text{PHr}}\$ (NEFT)",
     )
     ax.scatter(rslist_big, mean; color=cdict["blue"], s=4)
     mean = Measurements.value.(Fud2ds_pher_neft)
@@ -394,7 +476,7 @@ function plot_F_by_channel(isDynamic=false, z_renorm=false)
         plotdata(rslist_big, mean, stddev)...;
         color=cdict["cyan"],
         linestyle="--",
-        label="\$\\text{PHEr}\$ (NEFT)",
+        label="\$F^{\\uparrow\\downarrow}_{2,\\text{PHEr}}\$ (NEFT)",
     )
     ax.scatter(rslist_big, mean; color=cdict["cyan"], s=4)
     mean = Measurements.value.(Fud2ds_ppr_neft)
@@ -403,32 +485,47 @@ function plot_F_by_channel(isDynamic=false, z_renorm=false)
         plotdata(rslist_big, mean, stddev)...;
         color=cdict["teal"],
         linestyle="--",
-        label="\$\\text{PPr}\$ (NEFT)",
+        label="\$F^{\\uparrow\\downarrow}_{2,\\text{PPr}}\$ (NEFT)",
     )
     ax.scatter(rslist_big, mean; color=cdict["teal"], s=4)
+    mean = Measurements.value.(Fud2ds_neft)
+    stddev = Measurements.uncertainty.(Fud2ds_neft)
+    ax.plot(
+        plotdata(rslist_big, mean, stddev)...;
+        color=cdict["grey"],
+        linestyle="--",
+        label="\$F^{\\uparrow\\downarrow}_{2}\$ (NEFT)",
+    )
+    ax.scatter(rslist_big, mean; color=cdict["grey"], s=4)
     # Our data
     ax.plot(
         spline(rslist_small, Fud2ds_phr_ours)...;
         color=cdict["orange"],
-        label="\$\\text{PHr}\$",
+        label="\$F^{\\uparrow\\downarrow}_{2,\\text{PHr}}(\\theta_{12} = \\frac{\\pi}{2})\$",
     )
     ax.plot(
         spline(rslist_small, Fud2ds_pher_ours)...;
         color=cdict["magenta"],
-        label="\$\\text{PHEr}\$",
+        label="\$F^{\\uparrow\\downarrow}_{2,\\text{PHEr}}(\\theta_{12} = \\frac{\\pi}{2})\$",
     )
     ax.plot(
         spline(rslist_small, Fud2ds_ppr_ours)...;
         color=cdict["red"],
-        label="\$\\text{PPr}\$",
+        label="\$F^{\\uparrow\\downarrow}_{2,\\text{PPr}}(\\theta_{12} = \\frac{\\pi}{2})\$",
+    )
+    ax.plot(
+        spline(rslist_small, Fud2ds_ours)...;
+        color=cdict["black"],
+        label="\$F^{\\uparrow\\downarrow}_{2}(\\theta_{12} = \\frac{\\pi}{2})\$",
     )
     ax.set_xlabel("\$r_s\$")
-    ax.set_ylabel("\$F^{\\uparrow\\downarrow}_{2} \\xi^2\$")
+    # ax.set_ylabel("\$F^{\\uparrow\\downarrow}_{2} \\xi^2\$")
     if isDynamic == false
         # ax.set_ylim(-0.9, 0.9)
     end
     ax.set_xlim(0, 10)
-    ax.legend(; ncol=2, fontsize=12, loc="upper left", columnspacing=0.5)
+    ax.set_ylim(nothing, 0.95)
+    ax.legend(; ncol=2, fontsize=10, loc="upper left", columnspacing=0.5)
     plt.tight_layout()
     fig.savefig("oneloop_F2_ud_channels_vs_rs$(interactionstr)_$(leg_convention).pdf")
 
@@ -444,7 +541,7 @@ function plot_F_by_channel(isDynamic=false, z_renorm=false)
         plotdata(rslist_big, mean, stddev)...;
         color=cdict["blue"],
         linestyle="--",
-        label="\$\\text{PHr}\$ (NEFT)",
+        label="\$F^{s}_{2,\\text{PHr}}\$ (NEFT)",
     )
     ax.scatter(rslist_big, mean; color=cdict["blue"], s=4)
     mean = Measurements.value.(Fs2ds_pher_neft)
@@ -453,7 +550,7 @@ function plot_F_by_channel(isDynamic=false, z_renorm=false)
         plotdata(rslist_big, mean, stddev)...;
         color=cdict["cyan"],
         linestyle="--",
-        label="\$\\text{PHEr}\$ (NEFT)",
+        label="\$F^{s}_{2,\\text{PHEr}}\$ (NEFT)",
     )
     ax.scatter(rslist_big, mean; color=cdict["cyan"], s=4)
     mean = Measurements.value.(Fs2ds_ppr_neft)
@@ -462,32 +559,47 @@ function plot_F_by_channel(isDynamic=false, z_renorm=false)
         plotdata(rslist_big, mean, stddev)...;
         color=cdict["teal"],
         linestyle="--",
-        label="\$\\text{PPr}\$ (NEFT)",
+        label="\$F^{s}_{2,\\text{PPr}}\$ (NEFT)",
     )
     ax.scatter(rslist_big, mean; color=cdict["teal"], s=4)
+    mean = Measurements.value.(Fs2ds_neft)
+    stddev = Measurements.uncertainty.(Fs2ds_neft)
+    ax.plot(
+        plotdata(rslist_big, mean, stddev)...;
+        color=cdict["grey"],
+        linestyle="--",
+        label="\$F^{s}_{2}\$ (NEFT)",
+    )
+    ax.scatter(rslist_big, mean; color=cdict["grey"], s=4)
     # Our data
     ax.plot(
         spline(rslist_small, Fs2ds_phr_ours)...;
         color=cdict["orange"],
-        label="\$\\text{PHr}\$",
+        label="\$F^{s}_{2,\\text{PHr}}(\\theta_{12} = \\frac{\\pi}{2})\$",
     )
     ax.plot(
         spline(rslist_small, Fs2ds_pher_ours)...;
         color=cdict["magenta"],
-        label="\$\\text{PHEr}\$",
+        label="\$F^{s}_{2,\\text{PHEr}}(\\theta_{12} = \\frac{\\pi}{2})\$",
     )
     ax.plot(
         spline(rslist_small, Fs2ds_ppr_ours)...;
         color=cdict["red"],
-        label="\$\\text{PPr}\$",
+        label="\$F^{s}_{2,\\text{PPr}}(\\theta_{12} = \\frac{\\pi}{2})\$",
+    )
+    ax.plot(
+        spline(rslist_small, Fs2ds_ours)...;
+        color=cdict["black"],
+        label="\$F^{s}_{2}(\\theta_{12} = \\frac{\\pi}{2})\$",
     )
     ax.set_xlabel("\$r_s\$")
-    ax.set_ylabel("\$F^{s}_{2} \\xi^2\$")
+    # ax.set_ylabel("\$F^{s}_{2} \\xi^2\$")
     if isDynamic == false
         # ax.set_ylim(-0.9, 0.9)
     end
     ax.set_xlim(0, 10)
-    ax.legend(; ncol=2, fontsize=12, loc="upper left", columnspacing=0.5)
+    ax.set_ylim(nothing, 0.58)
+    ax.legend(; ncol=2, fontsize=10, loc="upper left", columnspacing=0.5)
     plt.tight_layout()
     fig.savefig("oneloop_F2_s_channels_vs_rs$(interactionstr)_$(leg_convention).pdf")
 
@@ -503,7 +615,7 @@ function plot_F_by_channel(isDynamic=false, z_renorm=false)
         plotdata(rslist_big, mean, stddev)...;
         color=cdict["blue"],
         linestyle="--",
-        label="\$\\text{PHr}\$ (NEFT)",
+        label="\$F^{a}_{2,\\text{PHr}}\$ (NEFT)",
     )
     ax.scatter(rslist_big, mean; color=cdict["blue"], s=4)
     mean = Measurements.value.(Fa2ds_pher_neft)
@@ -512,7 +624,7 @@ function plot_F_by_channel(isDynamic=false, z_renorm=false)
         plotdata(rslist_big, mean, stddev)...;
         color=cdict["cyan"],
         linestyle="--",
-        label="\$\\text{PHEr}\$ (NEFT)",
+        label="\$F^{a}_{2,\\text{PHEr}}\$ (NEFT)",
     )
     ax.scatter(rslist_big, mean; color=cdict["cyan"], s=4)
     mean = Measurements.value.(Fa2ds_ppr_neft)
@@ -521,32 +633,47 @@ function plot_F_by_channel(isDynamic=false, z_renorm=false)
         plotdata(rslist_big, mean, stddev)...;
         color=cdict["teal"],
         linestyle="--",
-        label="\$\\text{PPr}\$ (NEFT)",
+        label="\$F^{a}_{2,\\text{PPr}}\$ (NEFT)",
     )
     ax.scatter(rslist_big, mean; color=cdict["teal"], s=4)
+    mean = Measurements.value.(Fa2ds_neft)
+    stddev = Measurements.uncertainty.(Fa2ds_neft)
+    ax.plot(
+        plotdata(rslist_big, mean, stddev)...;
+        color=cdict["grey"],
+        linestyle="--",
+        label="\$F^{a}_{2}\$ (NEFT)",
+    )
+    ax.scatter(rslist_big, mean; color=cdict["grey"], s=4)
     # Our data
     ax.plot(
         spline(rslist_small, Fa2ds_phr_ours)...;
         color=cdict["orange"],
-        label="\$\\text{PHr}\$",
+        label="\$F^{a}_{2,\\text{PHr}}(\\theta_{12} = \\frac{\\pi}{2})\$",
     )
     ax.plot(
         spline(rslist_small, Fa2ds_pher_ours)...;
         color=cdict["magenta"],
-        label="\$\\text{PHEr}\$",
+        label="\$F^{a}_{2,\\text{PHEr}}(\\theta_{12} = \\frac{\\pi}{2})\$",
     )
     ax.plot(
         spline(rslist_small, Fa2ds_ppr_ours)...;
         color=cdict["red"],
-        label="\$\\text{PPr}\$",
+        label="\$F^{a}_{2,\\text{PPr}}(\\theta_{12} = \\frac{\\pi}{2})\$",
+    )
+    ax.plot(
+        spline(rslist_small, Fa2ds_ours)...;
+        color=cdict["black"],
+        label="\$F^{a}_{2}(\\theta_{12} = \\frac{\\pi}{2})\$",
     )
     ax.set_xlabel("\$r_s\$")
-    ax.set_ylabel("\$F^{a}_{2} \\xi^2\$")
+    # ax.set_ylabel("\$F^{a}_{2} \\xi^2\$")
     if isDynamic == false
         # ax.set_ylim(-0.9, 0.9)
     end
     ax.set_xlim(0, 10)
-    ax.legend(; ncol=2, fontsize=12, loc="upper left", columnspacing=0.5)
+    ax.set_ylim(nothing, 0.48)
+    ax.legend(; ncol=2, fontsize=10, loc="upper left", columnspacing=0.5)
     plt.tight_layout()
     fig.savefig("oneloop_F2_a_channels_vs_rs$(interactionstr)_$(leg_convention).pdf")
 

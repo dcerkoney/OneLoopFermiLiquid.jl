@@ -63,10 +63,10 @@ export get_tree_level_self_consistent_Fs, get_F1, get_F1_TF, get_Z1
 export Σ1, integrand_F1, x_NF_R0, x_NF_VTF, x_NF2_R02, x_NF2_VTF2
 
 include("matsubara_summands.jl")
-export box_matsubara_summand, vertex_matsubara_summand
+export total_box_matsubara_summand, box_matsubara_summand, vertex_matsubara_summand
 
 include("matsubara_sums.jl")
-export box_matsubara_sum, vertex_matsubara_sum
+export total_box_matsubara_sum, box_matsubara_sum, vertex_matsubara_sum
 
 include("one_loop_counterterms.jl")
 export one_loop_counterterms, one_loop_bubble_counterterm
@@ -75,15 +75,19 @@ include("one_loop_diagrams.jl")
 export initialize_one_loop_params!,
     get_one_loop_Fs,
     get_one_loop_box_contributions,
-    get_yukawa_one_loop_neft,
-    get_one_loop_graphs
+    get_yukawa_tree_level_neft,
+    get_forward_scattering_graphs
 export one_loop_box_diagram, one_loop_box_contribution, one_loop_vertex_contribution
 
 include("one_loop_mcmc.jl")
-export one_loop_mcmc_neft, get_yukawa_one_loop_neft
-export get_one_loop_graphs, get_individual_one_loop_graphs, get_vertex_graph
+export forward_scattering_mcmc_neft, get_yukawa_one_loop_neft, get_rpa_one_loop_neft
+export get_forward_scattering_graphs, get_individual_one_loop_graphs, get_vertex_graph
 export get_direct_crossed_box_graph, get_direct_uncrossed_box_graph
 export get_exchange_crossed_graph, get_exchange_uncrossed_graph
+
+include("one_loop_vegas.jl")
+export vegas_exchange_crossed_box_diagram
+export vegas_exchange_crossed_box_diagram_fixed_θ12
 
 struct OneLoopBoxDiagrams{T}
     F2b_direct_crossed::Tuple{T,T}

@@ -37,8 +37,8 @@ box_matsubara_sum(param::OneLoopParams, q, θ, φ; is_direct::Bool, is_crossed::
 """
 Evaluates the Matsubara sum for all box diagrams.
 """
-box_matsubara_sum(param::OneLoopParams, q, θ, φ, ftype) =
-    perform_bosonic_matsubara_sum(param, box_matsubara_summand, q, θ, φ; ftype=ftype)
+total_box_matsubara_sum(param::OneLoopParams, q, θ, φ, ftype) =
+    perform_bosonic_matsubara_sum(param, total_box_matsubara_summand, q, θ, φ; ftype=ftype)
 
 """
 Evaluates the Matsubara sum for the vertex corrections Λ₁(θ₁₂).

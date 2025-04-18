@@ -45,17 +45,17 @@ function box_matsubara_summand(
     qex = norm(vec_qex)
     # There are four kinds of box Matsubara summands entering F2
     _box_summand_args = Dict(
-        # crossed direct diagram
+        # direct crossed diagram
         (true, true) =>
             (m, vm) -> [(q, m), (q, m), (p1, iw0 + im * vm), (p2, iw0 + im * vm)],
-        # uncrossed direct diagram
-        (false, true) =>
-            (m, vm) -> [(q, m), (q, m), (p1, iw0 + im * vm), (p3, iw0 - im * vm)],
-        # crossed exchange diagram
+        # direct uncrossed diagram
         (true, false) =>
+            (m, vm) -> [(q, m), (q, m), (p1, iw0 + im * vm), (p3, iw0 - im * vm)],
+        # exchange crossed diagram
+        (false, true) =>
             (m, vm) ->
                 [(q, m), (qex, m), (p1, iw0 + im * vm), (p1, iw0 + im * vm), -0.5],
-        # uncrossed exchange diagram
+        # exchange uncrossed diagram
         (false, false) =>
             (m, vm) ->
                 [(q, m), (qex, m), (p1, iw0 + im * vm), (p3, iw0 - im * vm), -0.5],
@@ -72,7 +72,7 @@ end
 """
 Builds the total one-loop box Matsubara summand for Fs/Fa over the frequency mesh specified in `param`.
 """
-function box_matsubara_summand(param::OneLoopParams, q, θ, φ, ftype)
+function total_box_matsubara_summand(param::OneLoopParams, q, θ, φ; ftype="Fs")
     @assert ftype in ["Fs", "Fa"]
     @unpack β, NF, kamp1, kamp2, θ12, mgrid, vmgrid, iw0 = param
     # p1 = |k + q'|, p2 = |k' + q'|, p3 = |k' - q'|, qex = |k - k' + q'|

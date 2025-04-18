@@ -159,7 +159,7 @@ function plot_vertex_matsubara_sum(param::OneLoopParams)
                 )
             end
             ax.set_xlabel("\$\\theta\$")
-            ax.set_ylabel("\$S_\\text{v}(q, \\theta, \\phi; \\theta_{12} = \\pi / 2)\$")
+            ax.set_ylabel("\$S_\\text{v}(q, \\theta, \\phi; \\theta_{12} = \\frac{\\pi}{2})\$")
             ax.set_xlim(0, π)
             ax.set_xticks([0, π / 4, π / 2, 3π / 4, π])
             ax.set_xticklabels([
@@ -275,7 +275,7 @@ function plot_box_matsubara_sum(param::OneLoopParams; ftype="Fs")
                 )
             end
             ax.set_xlabel("\$\\theta\$")
-            ax.set_ylabel("\$S_\\text{b}(q, \\theta, \\phi; \\theta_{12} = \\pi / 2)\$")
+            ax.set_ylabel("\$S_\\text{b}(q, \\theta, \\phi; \\theta_{12} = \\frac{\\pi}{2})\$")
             ax.set_xlim(0, π)
             ax.set_xticks([0, π / 4, π / 2, 3π / 4, π])
             ax.set_xticklabels([
@@ -395,7 +395,7 @@ function plot_direct_box_matsubara_sum(param::OneLoopParams; which="both")
                 )
             end
             ax.set_xlabel("\$\\theta\$")
-            ax.set_ylabel("\$S_\\text{b,Di}(q, \\theta, \\phi; \\theta_{12} = \\pi / 2)\$")
+            ax.set_ylabel("\$S_\\text{b,Di}(q, \\theta, \\phi; \\theta_{12} = \\frac{\\pi}{2})\$")
             ax.set_xlim(0, π)
             ax.set_xticks([0, π / 4, π / 2, 3π / 4, π])
             ax.set_xticklabels([
@@ -496,7 +496,7 @@ function plot_extras(rslist, ftype)
         ax.set_ylim(-0.42, 0.42)
     end
     # ax.set_ylabel("\$F^s\$")
-    ax.legend(; ncol=2, fontsize=12, loc="best", columnspacing=0.5)
+    ax.legend(; ncol=2, fontsize=10, loc="best", columnspacing=0.5)
     plt.tight_layout()
     fig.savefig("oneloop_$(ftype)_yukawa_vs_rs$(interactionstr)_benchmark.pdf")
     plt.close(fig)
@@ -608,7 +608,7 @@ function plot_extras(rslist, ftype)
         ax.set_ylim(-0.42, 0.42)
     end
     # ax.set_ylabel("\$F^s\$")
-    ax.legend(; ncol=2, fontsize=12, loc="best", columnspacing=0.5)
+    ax.legend(; ncol=2, fontsize=10, loc="best", columnspacing=0.5)
     plt.tight_layout()
     fig.savefig("oneloop_$(ftype)_yukawa_vs_rs$(interactionstr).pdf")
     # fig.savefig("kappa0_over_kappa_yukawa_vs_rs.pdf")
@@ -745,7 +745,7 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     neft_factor_one_loop = 1.0
 
     chan = :PH
-    neft_splines = true
+    neft_splines = false
 
     function plotdata(x, y, e; error_multiplier=1.0)
         if neft_splines == false
@@ -755,11 +755,12 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
         return xspline, yspline
     end
 
-    interactionstr = isDynamic ? "" : "_yukawa"
+    rpastr = isDynamic ? "_rpa" : ""
+    interactionstr = isDynamic ? "_rpa" : "_yukawa"
     zstr = z_renorm ? "_z_renorm" : ""
 
     # Load NEFT benchmark data using jld2
-    @load "one_loop_F_neft_$(chan).jld2" rslist oneloop_sa_neft oneloop_ud_neft
+    @load "one_loop_F$(rpastr)_neft_$(chan).jld2" rslist oneloop_sa_neft oneloop_ud_neft
     rslist_big = rslist
     function loaddata_oneloop_neft(property::Symbol, representation="sa", factor=1.0)
         @assert representation in ["sa", "ud"]
@@ -829,10 +830,10 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     Fuus_ours, Fuds_ours = loaddata_oneloop_ours(:F, "ud")
 
     # Load our data for the four individual box diagram contributions
-    @load "one_loop_box_diagrams_ours.jld2" rslist boxdiags_sa_ours boxdiags_ud_ours
+    @load "one_loop_box_diagrams_ours.jld2" rslist boxdiags_sa boxdiags_ud
     function loaddata_boxdiags_ours(property::Symbol, representation="sa", factor=1.0)
         @assert representation in ["sa", "ud"]
-        data = representation == "sa" ? boxdiags_sa_ours : boxdiags_ud_ours
+        data = representation == "sa" ? boxdiags_sa : boxdiags_ud
         res = [factor .* x for x in getproperty.(data, property)]
         res_s, res_a = first.(res), last.(res)
         return res_s, res_a
@@ -850,165 +851,165 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     Fuu2bs_EC_ours, Fud2bs_EC_ours = loaddata_boxdiags_ours(:F2b_exchange_crossed, "ud")
     Fuu2bs_EU_ours, Fud2bs_EU_ours = loaddata_boxdiags_ours(:F2b_exchange_uncrossed, "ud")
 
-    #############################################
-    ### Fig 7: Individual F2↑↑ diagrams vs rs ###
-    #############################################
+    # #############################################
+    # ### Fig 7: Individual F2↑↑ diagrams vs rs ###
+    # #############################################
 
-    fig, ax = plt.subplots(; figsize=(5, 5))
-    # Our data
-    ax.plot(
-        spline(rslist_small, Fuu2bs_DC_ours)...;
-        color=cdict["orange"],
-        label="\$F^{\\uparrow\\uparrow,\\text{b}}_{2,\\text{DC}} \\xi^2\$",
-    )
-    ax.plot(
-        spline(rslist_small, Fuu2bs_DU_ours)...;
-        color=cdict["blue"],
-        label="\$F^{\\uparrow\\uparrow,\\text{b}}_{2,\\text{DU}} \\xi^2\$",
-    )
-    ax.plot(
-        spline(rslist_small, Fuu2bs_EC_ours)...;
-        color=cdict["cyan"],
-        label="\$F^{\\uparrow\\uparrow,\\text{b}}_{2,\\text{EC}} \\xi^2\$",
-    )
-    ax.plot(
-        spline(rslist_small, Fuu2bs_EU_ours)...;
-        color=cdict["magenta"],
-        label="\$F^{\\uparrow\\uparrow,\\text{b}}_{2,\\text{EU}} \\xi^2\$",
-    )
-    ax.plot(
-        spline(rslist_small, Fuu2vs_ours)...;
-        color=cdict["red"],
-        label="\$F^{\\uparrow\\uparrow,\\text{v}}_2 \\xi^2\$",
-    )
-    ax.set_xlabel("\$r_s\$")
-    if isDynamic == false
-        # ax.set_ylim(-0.9, 0.9)
-    end
-    ax.set_xlim(0, 10)
-    ax.legend(; ncol=2, fontsize=12, loc="upper left", columnspacing=0.5)
-    plt.tight_layout()
-    fig.savefig("oneloop_F2_uu_diagrams_vs_rs$(interactionstr)_$(chan).pdf")
+    # fig, ax = plt.subplots(; figsize=(5, 5))
+    # # Our data
+    # ax.plot(
+    #     spline(rslist_small, Fuu2bs_DC_ours)...;
+    #     color=cdict["orange"],
+    #     label="\$F^{\\uparrow\\uparrow,\\text{b}}_{2,\\text{DC}} \\xi^2\$",
+    # )
+    # ax.plot(
+    #     spline(rslist_small, Fuu2bs_DU_ours)...;
+    #     color=cdict["blue"],
+    #     label="\$F^{\\uparrow\\uparrow,\\text{b}}_{2,\\text{DU}} \\xi^2\$",
+    # )
+    # ax.plot(
+    #     spline(rslist_small, Fuu2bs_EC_ours)...;
+    #     color=cdict["cyan"],
+    #     label="\$F^{\\uparrow\\uparrow,\\text{b}}_{2,\\text{EC}} \\xi^2\$",
+    # )
+    # ax.plot(
+    #     spline(rslist_small, Fuu2bs_EU_ours)...;
+    #     color=cdict["magenta"],
+    #     label="\$F^{\\uparrow\\uparrow,\\text{b}}_{2,\\text{EU}} \\xi^2\$",
+    # )
+    # ax.plot(
+    #     spline(rslist_small, Fuu2vs_ours)...;
+    #     color=cdict["red"],
+    #     label="\$F^{\\uparrow\\uparrow,\\text{v}}_2 \\xi^2\$",
+    # )
+    # ax.set_xlabel("\$r_s\$")
+    # if isDynamic == false
+    #     # ax.set_ylim(-0.9, 0.9)
+    # end
+    # ax.set_xlim(0, 10)
+    # ax.legend(; ncol=2, fontsize=10, loc="upper left", columnspacing=0.5)
+    # plt.tight_layout()
+    # fig.savefig("oneloop_F2_uu_diagrams_vs_rs$(interactionstr)_$(chan).pdf")
 
-    #############################################
-    ### Fig 8: Individual F2↑↓ diagrams vs rs ###
-    #############################################
+    # #############################################
+    # ### Fig 8: Individual F2↑↓ diagrams vs rs ###
+    # #############################################
 
-    fig, ax = plt.subplots(; figsize=(5, 5))
-    # Our data
-    ax.plot(
-        spline(rslist_small, Fud2bs_DC_ours)...;
-        color=cdict["orange"],
-        label="\$F^{\\uparrow\\downarrow,\\text{b}}_{2,\\text{DC}} \\xi^2\$",
-    )
-    ax.plot(
-        spline(rslist_small, Fud2bs_DU_ours)...;
-        color=cdict["blue"],
-        label="\$F^{\\uparrow\\downarrow,\\text{b}}_{2,\\text{DU}} \\xi^2\$",
-    )
-    ax.plot(
-        spline(rslist_small, Fud2bs_EC_ours)...;
-        color=cdict["cyan"],
-        label="\$F^{\\uparrow\\downarrow,\\text{b}}_{2,\\text{EC}} \\xi^2\$",
-    )
-    ax.plot(
-        spline(rslist_small, Fud2bs_EU_ours)...;
-        color=cdict["magenta"],
-        label="\$F^{\\uparrow\\downarrow,\\text{b}}_{2,\\text{EU}} \\xi^2\$",
-    )
-    ax.plot(
-        spline(rslist_small, Fud2vs_ours)...;
-        color=cdict["red"],
-        label="\$F^{\\uparrow\\downarrow,\\text{v}}_2 \\xi^2\$",
-    )
-    ax.set_xlabel("\$r_s\$")
-    if isDynamic == false
-        ax.set_ylim(-0.26, 0.22)
-    end
-    ax.set_xlim(0, 10)
-    ax.legend(; ncol=2, fontsize=12, loc="upper left", columnspacing=0.5)
-    plt.tight_layout()
-    fig.savefig("oneloop_F2_ud_diagrams_vs_rs$(interactionstr)_$(chan).pdf")
+    # fig, ax = plt.subplots(; figsize=(5, 5))
+    # # Our data
+    # ax.plot(
+    #     spline(rslist_small, Fud2bs_DC_ours)...;
+    #     color=cdict["orange"],
+    #     label="\$F^{\\uparrow\\downarrow,\\text{b}}_{2,\\text{DC}} \\xi^2\$",
+    # )
+    # ax.plot(
+    #     spline(rslist_small, Fud2bs_DU_ours)...;
+    #     color=cdict["blue"],
+    #     label="\$F^{\\uparrow\\downarrow,\\text{b}}_{2,\\text{DU}} \\xi^2\$",
+    # )
+    # ax.plot(
+    #     spline(rslist_small, Fud2bs_EC_ours)...;
+    #     color=cdict["cyan"],
+    #     label="\$F^{\\uparrow\\downarrow,\\text{b}}_{2,\\text{EC}} \\xi^2\$",
+    # )
+    # ax.plot(
+    #     spline(rslist_small, Fud2bs_EU_ours)...;
+    #     color=cdict["magenta"],
+    #     label="\$F^{\\uparrow\\downarrow,\\text{b}}_{2,\\text{EU}} \\xi^2\$",
+    # )
+    # ax.plot(
+    #     spline(rslist_small, Fud2vs_ours)...;
+    #     color=cdict["red"],
+    #     label="\$F^{\\uparrow\\downarrow,\\text{v}}_2 \\xi^2\$",
+    # )
+    # ax.set_xlabel("\$r_s\$")
+    # if isDynamic == false
+    #     ax.set_ylim(-0.26, 0.22)
+    # end
+    # ax.set_xlim(0, 10)
+    # ax.legend(; ncol=2, fontsize=10, loc="upper left", columnspacing=0.5)
+    # plt.tight_layout()
+    # fig.savefig("oneloop_F2_ud_diagrams_vs_rs$(interactionstr)_$(chan).pdf")
 
-    ############################################
-    ### Fig 9: Individual F2s diagrams vs rs ###
-    ############################################
+    # ############################################
+    # ### Fig 9: Individual F2s diagrams vs rs ###
+    # ############################################
 
-    fig, ax = plt.subplots(; figsize=(5, 5))
-    # Our data
-    ax.plot(
-        spline(rslist_small, Fs2bs_DC_ours)...;
-        color=cdict["orange"],
-        label="\$F^{s,\\text{b}}_{2,\\text{DC}} \\xi^2\$",
-    )
-    ax.plot(
-        spline(rslist_small, Fs2bs_DU_ours)...;
-        color=cdict["blue"],
-        label="\$F^{s,\\text{b}}_{2,\\text{DU}} \\xi^2\$",
-    )
-    ax.plot(
-        spline(rslist_small, Fs2bs_EC_ours)...;
-        color=cdict["cyan"],
-        label="\$F^{s,\\text{b}}_{2,\\text{EC}} \\xi^2\$",
-    )
-    ax.plot(
-        spline(rslist_small, Fs2bs_EU_ours)...;
-        color=cdict["magenta"],
-        label="\$F^{s,\\text{b}}_{2,\\text{EU}} \\xi^2\$",
-    )
-    ax.plot(
-        spline(rslist_small, Fs2vs_ours)...;
-        color=cdict["red"],
-        label="\$F^{s,\\text{v}}_2 \\xi^2\$",
-    )
-    ax.set_xlabel("\$r_s\$")
-    if isDynamic == false
-        # ax.set_ylim(-0.9, 0.9)
-    end
-    ax.set_xlim(0, 10)
-    ax.legend(; ncol=2, fontsize=12, loc="upper left", columnspacing=0.5)
-    plt.tight_layout()
-    fig.savefig("oneloop_F2_s_diagrams_vs_rs$(interactionstr)_$(chan).pdf")
+    # fig, ax = plt.subplots(; figsize=(5, 5))
+    # # Our data
+    # ax.plot(
+    #     spline(rslist_small, Fs2bs_DC_ours)...;
+    #     color=cdict["orange"],
+    #     label="\$F^{s,\\text{b}}_{2,\\text{DC}} \\xi^2\$",
+    # )
+    # ax.plot(
+    #     spline(rslist_small, Fs2bs_DU_ours)...;
+    #     color=cdict["blue"],
+    #     label="\$F^{s,\\text{b}}_{2,\\text{DU}} \\xi^2\$",
+    # )
+    # ax.plot(
+    #     spline(rslist_small, Fs2bs_EC_ours)...;
+    #     color=cdict["cyan"],
+    #     label="\$F^{s,\\text{b}}_{2,\\text{EC}} \\xi^2\$",
+    # )
+    # ax.plot(
+    #     spline(rslist_small, Fs2bs_EU_ours)...;
+    #     color=cdict["magenta"],
+    #     label="\$F^{s,\\text{b}}_{2,\\text{EU}} \\xi^2\$",
+    # )
+    # ax.plot(
+    #     spline(rslist_small, Fs2vs_ours)...;
+    #     color=cdict["red"],
+    #     label="\$F^{s,\\text{v}}_2 \\xi^2\$",
+    # )
+    # ax.set_xlabel("\$r_s\$")
+    # if isDynamic == false
+    #     # ax.set_ylim(-0.9, 0.9)
+    # end
+    # ax.set_xlim(0, 10)
+    # ax.legend(; ncol=2, fontsize=10, loc="upper left", columnspacing=0.5)
+    # plt.tight_layout()
+    # fig.savefig("oneloop_F2_s_diagrams_vs_rs$(interactionstr)_$(chan).pdf")
 
-    #############################################
-    ### Fig 10: Individual F2a diagrams vs rs ###
-    #############################################
+    # #############################################
+    # ### Fig 10: Individual F2a diagrams vs rs ###
+    # #############################################
 
-    fig, ax = plt.subplots(; figsize=(5, 5))
-    # Our data
-    ax.plot(
-        spline(rslist_small, Fa2bs_DC_ours)...;
-        color=cdict["orange"],
-        label="\$F^{a,\\text{b}}_{2,\\text{DC}} \\xi^2\$",
-    )
-    ax.plot(
-        spline(rslist_small, Fa2bs_DU_ours)...;
-        color=cdict["blue"],
-        label="\$F^{a,\\text{b}}_{2,\\text{DU}} \\xi^2\$",
-    )
-    ax.plot(
-        spline(rslist_small, Fa2bs_EC_ours)...;
-        color=cdict["cyan"],
-        label="\$F^{a,\\text{b}}_{2,\\text{EC}} \\xi^2\$",
-    )
-    ax.plot(
-        spline(rslist_small, Fa2bs_EU_ours)...;
-        color=cdict["magenta"],
-        label="\$F^{a,\\text{b}}_{2,\\text{EU}} \\xi^2\$",
-    )
-    ax.plot(
-        spline(rslist_small, Fa2vs_ours)...;
-        color=cdict["red"],
-        label="\$F^{a,\\text{v}}_2 \\xi^2\$",
-    )
-    ax.set_xlabel("\$r_s\$")
-    if isDynamic == false
-        # ax.set_ylim(-0.9, 0.9)
-    end
-    ax.set_xlim(0, 10)
-    ax.legend(; ncol=2, fontsize=12, loc="upper left", columnspacing=0.5)
-    plt.tight_layout()
-    fig.savefig("oneloop_F2_a_diagrams_vs_rs$(interactionstr)_$(chan).pdf")
+    # fig, ax = plt.subplots(; figsize=(5, 5))
+    # # Our data
+    # ax.plot(
+    #     spline(rslist_small, Fa2bs_DC_ours)...;
+    #     color=cdict["orange"],
+    #     label="\$F^{a,\\text{b}}_{2,\\text{DC}} \\xi^2\$",
+    # )
+    # ax.plot(
+    #     spline(rslist_small, Fa2bs_DU_ours)...;
+    #     color=cdict["blue"],
+    #     label="\$F^{a,\\text{b}}_{2,\\text{DU}} \\xi^2\$",
+    # )
+    # ax.plot(
+    #     spline(rslist_small, Fa2bs_EC_ours)...;
+    #     color=cdict["cyan"],
+    #     label="\$F^{a,\\text{b}}_{2,\\text{EC}} \\xi^2\$",
+    # )
+    # ax.plot(
+    #     spline(rslist_small, Fa2bs_EU_ours)...;
+    #     color=cdict["magenta"],
+    #     label="\$F^{a,\\text{b}}_{2,\\text{EU}} \\xi^2\$",
+    # )
+    # ax.plot(
+    #     spline(rslist_small, Fa2vs_ours)...;
+    #     color=cdict["red"],
+    #     label="\$F^{a,\\text{v}}_2 \\xi^2\$",
+    # )
+    # ax.set_xlabel("\$r_s\$")
+    # if isDynamic == false
+    #     # ax.set_ylim(-0.9, 0.9)
+    # end
+    # ax.set_xlim(0, 10)
+    # ax.legend(; ncol=2, fontsize=10, loc="upper left", columnspacing=0.5)
+    # plt.tight_layout()
+    # fig.savefig("oneloop_F2_a_diagrams_vs_rs$(interactionstr)_$(chan).pdf")
 
     ############################
     ### Fig 1: F↑↑/F↑↓ vs rs ###
@@ -1045,20 +1046,26 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     ax.scatter(rslist_big, mean; color=cdict["magenta"], s=4)
     # Our data
     ax.plot(
+        spline(rslist_small, Fud1s_ours)...;
+        color=cdict["grey"],
+        label="\$F^{\\uparrow\\downarrow}_1 \\xi\$",
+        zorder=-1,
+    )
+    # ax.plot(
+    #     spline(rslist_small, Fuus_ours)...;
+    #     color=cdict["blue"],
+    #     label="\$F^{\\uparrow\\uparrow}_1\\xi + F^{\\uparrow\\uparrow}_2(\\theta_{12} = \\frac{\\pi}{2}) \\xi^2\$",
+    # )
+    # ax.plot(
+    #     spline(rslist_small, Fuds_ours)...;
+    #     color=cdict["cyan"],
+    #     label="\$F^{\\uparrow\\downarrow}_1\\xi + F^{\\uparrow\\downarrow}_2(\\theta_{12} = \\frac{\\pi}{2}) \\xi^2\$",
+    # )
+    ax.plot(
         spline(rslist_small, Fuu1s_ours)...;
         color=cdict["black"],
         label="\$F^{\\uparrow\\uparrow}_1 \\xi\$",
         zorder=-1,
-    )
-    ax.plot(
-        spline(rslist_small, Fuus_ours)...;
-        color=cdict["blue"],
-        label="\$F^{\\uparrow\\uparrow}_1\\xi + F^{\\uparrow\\uparrow}_2 \\xi^2\$",
-    )
-    ax.plot(
-        spline(rslist_small, Fuds_ours)...;
-        color=cdict["cyan"],
-        label="\$F^{\\uparrow\\downarrow}_1\\xi + F^{\\uparrow\\downarrow}_2 \\xi^2\$",
     )
     ax.set_xlabel("\$r_s\$")
     # ax.set_ylabel("\$F^{\\sigma_1 \\sigma_2}\$")
@@ -1067,7 +1074,7 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     end
     ax.set_xlim(0, 10)
     # ax.set_ylabel("\$F^s\$")
-    ax.legend(; ncol=2, fontsize=12, loc="upper left", columnspacing=0.5)
+    ax.legend(; ncol=2, fontsize=10, loc="upper left", columnspacing=0.5)
     plt.tight_layout()
     fig.savefig("oneloop_F_uu_and_ud$(interactionstr)_vs_rs_$(chan).pdf")
     plt.close(fig)
@@ -1109,18 +1116,18 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     ax.plot(
         spline(rslist_small, Fuu2cts_ours)...;
         color=cdict["teal"],
-        label="\$F^{\\uparrow\\uparrow,\\text{ct}}_2 \\xi^2\$",
+        label="\$F^{\\uparrow\\uparrow,\\text{ct}}_2(\\theta_{12} = \\frac{\\pi}{2}) \\xi^2\$",
     )
-    ax.plot(
-        spline(rslist_small, Fuu2ds_ours)...;
-        color=cdict["blue"],
-        label="\$F^{\\uparrow\\uparrow,\\text{d}}_2 \\xi^2\$",
-    )
-    ax.plot(
-        spline(rslist_small, Fuu2s_ours)...;
-        color=cdict["cyan"],
-        label="\$F^{\\uparrow\\uparrow}_2 \\xi^2\$",
-    )
+    # ax.plot(
+    #     spline(rslist_small, Fuu2ds_ours)...;
+    #     color=cdict["blue"],
+    #     label="\$F^{\\uparrow\\uparrow,\\text{d}}_2(\\theta_{12} = \\frac{\\pi}{2}) \\xi^2\$",
+    # )
+    # ax.plot(
+    #     spline(rslist_small, Fuu2s_ours)...;
+    #     color=cdict["cyan"],
+    #     label="\$F^{\\uparrow\\uparrow}_2(\\theta_{12} = \\frac{\\pi}{2}) \\xi^2\$",
+    # )
     ax.set_xlabel("\$r_s\$")
     # ax.set_ylabel("\$F^{\\sigma_1 \\sigma_2}\$")
     if isDynamic == false
@@ -1128,7 +1135,7 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     end
     # ax.set_ylabel("\$F^s\$")
     ax.set_xlim(0, 10)
-    ax.legend(; ncol=2, fontsize=12, loc="upper left", columnspacing=0.5)
+    ax.legend(; ncol=2, fontsize=10, loc="upper left", columnspacing=0.5)
     plt.tight_layout()
     fig.savefig("oneloop_F2_uu$(interactionstr)_vs_rs_$(chan).pdf")
     plt.close(fig)
@@ -1172,18 +1179,18 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     ax.plot(
         spline(rslist_small, Fud2cts_ours)...;
         color=cdict["teal"],
-        label="\$F^{\\uparrow\\downarrow,\\text{ct}}_2 \\xi^2\$",
+        label="\$F^{\\uparrow\\downarrow,\\text{ct}}_2(\\theta_{12} = \\frac{\\pi}{2}) \\xi^2\$",
     )
-    ax.plot(
-        spline(rslist_small, Fud2ds_ours)...;
-        color=cdict["blue"],
-        label="\$F^{\\uparrow\\downarrow,\\text{d}}_2 \\xi^2\$",
-    )
-    ax.plot(
-        spline(rslist_small, Fud2s_ours)...;
-        color=cdict["cyan"],
-        label="\$F^{\\uparrow\\downarrow}_2 \\xi^2\$",
-    )
+    # ax.plot(
+    #     spline(rslist_small, Fud2ds_ours)...;
+    #     color=cdict["blue"],
+    #     label="\$F^{\\uparrow\\downarrow,\\text{d}}_2(\\theta_{12} = \\frac{\\pi}{2}) \\xi^2\$",
+    # )
+    # ax.plot(
+    #     spline(rslist_small, Fud2s_ours)...;
+    #     color=cdict["cyan"],
+    #     label="\$F^{\\uparrow\\downarrow}_2(\\theta_{12} = \\frac{\\pi}{2}) \\xi^2\$",
+    # )
     ax.set_xlabel("\$r_s\$")
     # ax.set_ylabel("\$F^{\\sigma_1 \\sigma_2}\$")
     # if isDynamic == false
@@ -1191,7 +1198,7 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     # end
     # ax.set_ylabel("\$F^s\$")
     ax.set_xlim(0, 10)
-    ax.legend(; ncol=2, fontsize=12, loc="upper left", columnspacing=0.5)
+    ax.legend(; ncol=2, fontsize=10, loc="upper left", columnspacing=0.5)
     plt.tight_layout()
     fig.savefig("oneloop_F2_ud$(interactionstr)_vs_rs_$(chan).pdf")
     plt.close(fig)
@@ -1231,20 +1238,27 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     ax.scatter(rslist_big, mean; color=cdict["magenta"], s=4)
     # Our data
     ax.plot(
-        spline(rslist_small, Fs1s_ours)...;
-        color=cdict["black"],
-        label="\$F^{s}_1 \\xi = F^{a}_1 \\xi\$",
+        spline(rslist_small, Fa1s_ours)...;
+        color=cdict["grey"],
+        label="\$F^{a}_1 \\xi\$",
         zorder=-1,
     )
+    # ax.plot(
+    #     spline(rslist_small, Fss_ours)...;
+    #     color=cdict["blue"],
+    #     label="\$F^{s}_1\\xi + F^{s}_2(\\theta_{12} = \\frac{\\pi}{2}) \\xi^2\$",
+    # )
+    # ax.plot(
+    #     spline(rslist_small, Fas_ours)...;
+    #     color=cdict["cyan"],
+    #     label="\$F^{a}_1\\xi + F^{a}_2(\\theta_{12} = \\frac{\\pi}{2}) \\xi^2\$",
+    # )
     ax.plot(
-        spline(rslist_small, Fss_ours)...;
-        color=cdict["blue"],
-        label="\$F^{s}_1\\xi + F^{s}_2 \\xi^2\$",
-    )
-    ax.plot(
-        spline(rslist_small, Fas_ours)...;
-        color=cdict["cyan"],
-        label="\$F^{a}_1\\xi + F^{a}_2 \\xi^2\$",
+        spline(rslist_small, Fs1s_ours)...;
+        color=cdict["black"],
+        label="\$F^{s}_1 \\xi\$",
+        # linestyle="--",
+        zorder=-1,
     )
     ax.set_xlabel("\$r_s\$")
     # ax.set_ylabel("\$F^{\\sigma_1 \\sigma_2}\$")
@@ -1253,7 +1267,7 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     end
     ax.set_xlim(0, 10)
     # ax.set_ylabel("\$F^s\$")
-    ax.legend(; ncol=2, fontsize=12, loc="upper right", columnspacing=0.5)
+    ax.legend(; ncol=2, fontsize=10, loc="upper right", columnspacing=0.5)
     plt.tight_layout()
     fig.savefig("oneloop_F_s_and_a$(interactionstr)_vs_rs_$(chan).pdf")
     plt.close(fig)
@@ -1298,16 +1312,16 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
         color=cdict["teal"],
         label="\$F^{s,\\text{ct}}_2 \\xi^2\$",
     )
-    ax.plot(
-        spline(rslist_small, Fs2ds_ours)...;
-        color=cdict["blue"],
-        label="\$F^{s,\\text{d}}_2 \\xi^2\$",
-    )
-    ax.plot(
-        spline(rslist_small, Fs2s_ours)...;
-        color=cdict["cyan"],
-        label="\$F^{s}_2 \\xi^2\$",
-    )
+    # ax.plot(
+    #     spline(rslist_small, Fs2ds_ours)...;
+    #     color=cdict["blue"],
+    #     label="\$F^{s,\\text{d}}_2(\\theta_{12} = \\frac{\\pi}{2}) \\xi^2\$",
+    # )
+    # ax.plot(
+    #     spline(rslist_small, Fs2s_ours)...;
+    #     color=cdict["cyan"],
+    #     label="\$F^{s}_2(\\theta_{12} = \\frac{\\pi}{2}) \\xi^2\$",
+    # )
     ax.set_xlabel("\$r_s\$")
     # ax.set_ylabel("\$F^{\\sigma_1 \\sigma_2}\$")
     if isDynamic == false
@@ -1315,7 +1329,7 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     end
     # ax.set_ylabel("\$F^s\$")
     ax.set_xlim(0, 10)
-    ax.legend(; ncol=2, fontsize=12, loc="upper left", columnspacing=0.5)
+    ax.legend(; ncol=2, fontsize=10, loc="upper left", columnspacing=0.5)
     plt.tight_layout()
     fig.savefig("oneloop_F2_s$(interactionstr)_vs_rs_$(chan).pdf")
     plt.close(fig)
@@ -1353,17 +1367,17 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
         color=cdict["teal"],
         label="\$F^{a,\\text{ct}}_2 \\xi^2\$",
     )
-    ax.plot(
-        spline(rslist_small, Fa2ds_ours)...;
-        color=cdict["blue"],
-        label="\$F^{a,\\text{d}}_2 \\xi^2\$",
-        zorder=100,
-    )
-    ax.plot(
-        spline(rslist_small, Fs2s_ours)...;
-        color=cdict["cyan"],
-        label="\$F^{s}_2 \\xi^2\$",
-    )
+    # ax.plot(
+    #     spline(rslist_small, Fa2ds_ours)...;
+    #     color=cdict["blue"],
+    #     label="\$F^{a,\\text{d}}_2(\\theta_{12} = \\frac{\\pi}{2}) \\xi^2\$",
+    #     zorder=100,
+    # )
+    # ax.plot(
+    #     spline(rslist_small, Fa2s_ours)...;
+    #     color=cdict["cyan"],
+    #     label="\$F^{a}_2(\\theta_{12} = \\frac{\\pi}{2}) \\xi^2\$",
+    # )
     ax.set_xlabel("\$r_s\$")
     # ax.set_ylabel("\$F^{\\sigma_1 \\sigma_2}\$")
     if isDynamic == false
@@ -1371,7 +1385,7 @@ function plot_F_uu_ud_NEFT(isDynamic, z_renorm)
     end
     # ax.set_ylabel("\$F^s\$")
     ax.set_xlim(0, 10)
-    ax.legend(; ncol=2, fontsize=12, loc="upper left", columnspacing=0.5)
+    ax.legend(; ncol=2, fontsize=10, loc="upper left", columnspacing=0.5)
     plt.tight_layout()
     fig.savefig("oneloop_F2_a$(interactionstr)_vs_rs_$(chan).pdf")
     plt.close(fig)
@@ -1396,8 +1410,11 @@ function main()
     plot_ours = true
     plot_integrands = false
 
-    # Yukawa interaction
-    isDynamic = false
+    # # Yukawa interaction
+    # isDynamic = false
+
+    # RPA interaction
+    isDynamic = true
 
     # ftype = "Fs"  # f^{Di} + f^{Ex} / 2
     # ftype = "Fa"  # f^{Ex} / 2
