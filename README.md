@@ -1,3 +1,3 @@
 # OneLoopFermiLiquid
 
-[![Build Status](https://github.com/dcerkoney/OneLoopFermiLiquid.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/dcerkoney/OneLoopFermiLiquid.jl/actions/workflows/CI.yml?query=branch%3Amain)
+One-loop evaluation of the local Fermi liquid effective field theory built on top of [ElectronGas.jl](https://github.com/numericalEFT/ElectronGas.jl) and [ElectronLiquid.jl](https://github.com/numericalEFT/ElectronLiquid.jl).
