@@ -80,7 +80,8 @@ export initialize_one_loop_params!,
 export one_loop_box_diagram, one_loop_box_contribution, one_loop_vertex_contribution
 
 include("one_loop_mcmc.jl")
-export forward_scattering_mcmc_neft, get_yukawa_one_loop_neft, get_rpa_one_loop_neft
+export forward_scattering_mcmc_neft, get_yukawa_one_loop_neft
+export get_rpa_tree_level_neft, get_rpa_one_loop_neft
 export get_forward_scattering_graphs, get_individual_one_loop_graphs, get_vertex_graph
 export get_direct_crossed_box_graph, get_direct_uncrossed_box_graph
 export get_exchange_crossed_graph, get_exchange_uncrossed_graph

@@ -364,7 +364,7 @@ function get_rpa_one_loop_neft(
     oneloop_neft_ud = []
     for rs in rslist
         println("\nrs = $rs:")
-        qTF = Parameter.rydbergUnit(1.0 / beta, rs, 3).qTF
+        # qTF = Parameter.rydbergUnit(1.0 / beta, rs, 3).qTF
         paramc = ElectronLiquid.ParaMC(;
             rs=rs,
             beta=beta,
@@ -466,6 +466,73 @@ function get_yukawa_tree_level_neft(
             order=1,
             mass2=qTF^2,  # for a particularly simple dimensionless interaction
             isDynamic=false,
+        )
+        @unpack e0, NF, mass2, basic = paramc
+        # data, result = Ver4.MC_lavg(
+        data, result = forward_scattering_mcmc_neft(
+            paramc;
+            neval=neval,
+            n=transferFrequencyIndices,
+            channels=channels,
+            partitions=partitions,
+            leg_convention=leg_convention,
+            seed=seed,
+            print=-1,
+        )
+        if isnothing(data) == false
+            # # tree-level F1↑↑ and F1↑↓ calculated exactly
+            # Fs1 = Fa1 = get_F1_TF(rs)
+            # F1 = measurement.((Ver4.sa2ud(Fs1, Fa1)))  # = (2 * get_F1_TF(rs), 0.0)
+            
+            # tree-level diagram from NEFT toolbox
+            F1_ud = Tuple(real(data[partitions[1]]))
+            F1_sa = Ver4.ud2sa(F1_ud...)
+            push!(treelevel_neft_sa, F1_sa)
+            push!(treelevel_neft_ud, F1_ud)
+            GC.gc()
+        end
+    end
+    # NOTE: there is an extra factor of (-1)ᵐ = -1 due
+    #       to the difference of Feynman rules V ↦ -V
+    return treelevel_neft_sa, treelevel_neft_ud
+end
+
+"""
+Benchmark for the tree-level calculation of F for the R-type theory using the NEFT toolbox.
+"""
+function get_rpa_tree_level_neft(
+    rslist,
+    beta;
+    neval=1e6,
+    seed=1234,
+    leg_convention=:PH,
+    channels=[PHr, PHEr, PPr],  # NOTE: Alli does not contribute up to one-loop order
+    noTransferMomentum=true,
+)
+    partitions = [(0, 0, 0)]
+
+    # TODO: Determine which of these is correct (matters for dynamic interactions!)
+    #       with -1, we have a transfer frequency of iν₁ = i2πT, and with all zeros,
+    #       we have iν₀ = 0.
+    if noTransferMomentum
+        transferFrequencyIndices = [0, 0, 0]
+    else
+        error("Nonzero transfer momentum depends on Ex/Di—not yet implemented!")
+        # transferFrequencyIndices = [-1, 0, 0] for Ex, [-1, -1, 0] for Di
+    end
+
+    treelevel_neft_sa = []
+    treelevel_neft_ud = []
+    for rs in rslist
+        println("\nrs = $rs:")
+        # qTF = Parameter.rydbergUnit(1.0 / beta, rs, 3).qTF
+        paramc = ElectronLiquid.ParaMC(;
+            rs=rs,
+            beta=beta,
+            Fs=0.0,
+            order=0,
+            mass2=0.001,  # in case of divergences
+            isDynamic=true,
         )
         @unpack e0, NF, mass2, basic = paramc
         # data, result = Ver4.MC_lavg(

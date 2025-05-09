@@ -52,7 +52,7 @@ function main()
     show_progress = true
     leg_convention = :PH  # or :PP — just an external leg ordering convention, doesn't affect the final result
 
-    neval = 1e7
+    neval = 1e6
     # neval = 4e8  # final results
 
     run_channels = [PHr, PHEr, PPr, AnyChan]
